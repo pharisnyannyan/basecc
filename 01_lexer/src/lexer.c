@@ -58,6 +58,23 @@ static Token lex_number(Lexer *lexer)
     return token;
 }
 
+static Token lex_negative_number(Lexer *lexer)
+{
+    size_t start = lexer->pos;
+    long value = 0;
+
+    lexer->pos++;
+    while (isdigit((unsigned char)lexer->input[lexer->pos])) {
+        value = (value * 10) + (lexer->input[lexer->pos] - '0');
+        lexer->pos++;
+    }
+
+    Token token = make_token(TOKEN_NUMBER, lexer->input + start,
+        lexer->pos - start);
+    token.value = -value;
+    return token;
+}
+
 static Token lex_identifier(Lexer *lexer)
 {
     size_t start = lexer->pos;
@@ -86,8 +103,8 @@ static Token lex_punctuator(Lexer *lexer)
     }
 
     if (ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '('
-        || ch == ')' || ch == '{' || ch == '}' || ch == ';' || ch == ','
-        || ch == '=') {
+        || ch == '%' || ch == ')' || ch == '{' || ch == '}' || ch == ';'
+        || ch == ',' || ch == '=') {
         lexer->pos++;
         return make_token(TOKEN_PUNCT, lexer->input + start, 1);
     }
@@ -106,6 +123,12 @@ Token lexer_next(Lexer *lexer)
 
     if (isdigit((unsigned char)lexer->input[lexer->pos])) {
         return lex_number(lexer);
+    }
+
+    if (lexer->input[lexer->pos] == '-'
+        && lexer->input[lexer->pos + 1] != '\0'
+        && isdigit((unsigned char)lexer->input[lexer->pos + 1])) {
+        return lex_negative_number(lexer);
     }
 
     if (is_ident_start((unsigned char)lexer->input[lexer->pos])) {

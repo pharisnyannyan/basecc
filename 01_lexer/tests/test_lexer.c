@@ -31,6 +31,20 @@ static void assert_true(int condition, const char *message)
     }
 }
 
+static void assert_token_text(Token token, const char *text)
+{
+    size_t length = strlen(text);
+
+    assert_true(token.length == length, "unexpected token length");
+    assert_true(strncmp(token.start, text, length) == 0,
+        "unexpected token text");
+}
+
+static void assert_punct_token(Token token, const char *text)
+{
+    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    assert_token_text(token, text);
+}
 static void test_ident_and_number(void)
 {
     Lexer lexer;
@@ -68,7 +82,7 @@ static void test_punctuators(void)
     Token token;
 
     begin_test("punctuators");
-    lexer_init(&lexer, "()+-*/;,{ }==!= =");
+    lexer_init(&lexer, "()+-*/%;,{ }==!= =");
 
     token = lexer_next(&lexer);
     assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
@@ -99,6 +113,11 @@ static void test_punctuators(void)
     assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
     assert_true(token.length == 1, "expected length 1");
     assert_true(strncmp(token.start, "/", 1) == 0, "expected text '/'");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    assert_true(token.length == 1, "expected length 1");
+    assert_true(strncmp(token.start, "%", 1) == 0, "expected text '%'");
 
     token = lexer_next(&lexer);
     assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
@@ -188,6 +207,42 @@ static void test_number_boundaries(void)
     assert_true(token.length == 0, "expected empty EOF token");
 }
 
+static void test_negative_numbers(void)
+{
+    Lexer lexer;
+    Token token;
+
+    begin_test("negative numbers");
+    lexer_init(&lexer, "-7 -0 - 8");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    assert_true(token.length == 2, "expected length 2");
+    assert_true(strncmp(token.start, "-7", 2) == 0, "expected text '-7'");
+    assert_true(token.value == -7, "expected value -7");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    assert_true(token.length == 2, "expected length 2");
+    assert_true(strncmp(token.start, "-0", 2) == 0, "expected text '-0'");
+    assert_true(token.value == 0, "expected value 0");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    assert_true(token.length == 1, "expected length 1");
+    assert_true(strncmp(token.start, "-", 1) == 0, "expected text '-'");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    assert_true(token.length == 1, "expected length 1");
+    assert_true(strncmp(token.start, "8", 1) == 0, "expected text '8'");
+    assert_true(token.value == 8, "expected value 8");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    assert_true(token.length == 0, "expected empty EOF token");
+}
+
 static void test_invalid_character(void)
 {
     Lexer lexer;
@@ -200,6 +255,77 @@ static void test_invalid_character(void)
     assert_true(token.type == TOKEN_INVALID, "expected TOKEN_INVALID");
     assert_true(token.length == 1, "expected length 1");
     assert_true(strncmp(token.start, "@", 1) == 0, "expected text '@'");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    assert_true(token.length == 0, "expected empty EOF token");
+}
+
+static void test_sample_program(void)
+{
+    Lexer lexer;
+    Token token;
+
+    begin_test("sample program");
+    lexer_init(&lexer, "int main(){int x=-7%3;return x;}");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "int");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "main");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, "(");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, ")");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, "{");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "int");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "x");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, "=");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    assert_token_text(token, "-7");
+    assert_true(token.value == -7, "expected value -7");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, "%");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    assert_token_text(token, "3");
+    assert_true(token.value == 3, "expected value 3");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, ";");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "return");
+
+    token = lexer_next(&lexer);
+    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    assert_token_text(token, "x");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, ";");
+
+    token = lexer_next(&lexer);
+    assert_punct_token(token, "}");
 
     token = lexer_next(&lexer);
     assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
@@ -224,7 +350,9 @@ int main(void)
     test_punctuators();
     test_identifiers_with_underscores();
     test_number_boundaries();
+    test_negative_numbers();
     test_invalid_character();
+    test_sample_program();
     test_whitespace_only();
     printf("ok\n");
     return 0;

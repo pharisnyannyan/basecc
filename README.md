@@ -15,6 +15,15 @@ The project deliberately favors:
 - boring, readable C
 - minimal tooling
 
+## Intermediate representation and backends
+BaseCC targets **LLVM IR as the default intermediate representation**. This default keeps the compiler easy to inspect while enabling familiar tooling. The design must remain flexible:
+- The IR/backend layer should be swappable without rewriting front-end stages.
+- The compiler should be able to emit alternative IRs or custom machine code backends.
+- Direct emission of real machine code is a supported goal.
+- A custom VM instruction set is also a valid backend target.
+
+In practice this means stages should clearly separate front-end analysis from IR emission and backend lowering, so additional backends can be introduced incrementally.
+
 ## Core principles
 - BSD-leaning coding style: clear, disciplined, unsurprising C
 - No clever tricks, no macro-heavy abstractions

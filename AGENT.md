@@ -7,6 +7,8 @@ These guidelines apply to the entire repository.
 - Use simple data structures and readable C.
 - Avoid macro-heavy abstractions and surprising tricks.
 - Keep changes small and easy to review.
+- Treat LLVM IR as the default output, but keep the IR/backend layer swappable for
+  alternative IRs, native machine code emission, or custom VM instruction sets.
 
 ## Repository structure
 - Organize compiler stages as one directory per stage.

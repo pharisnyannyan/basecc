@@ -6,7 +6,7 @@ CPPFLAGS ?= -I../include -I../../03_checker/include -I../../02_parser/include \
 
 BUILD_DIR := build
 LL := ../build/codegen_arithmetic.ll
-INPUT := ../testdata/arithmetic_runtime.c
+INPUT := ../tests/testdata/arithmetic_runtime.c
 EXPECTED := arithmetic_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a

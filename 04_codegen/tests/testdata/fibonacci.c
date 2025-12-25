@@ -6,16 +6,16 @@ int fib(int n) {
     return n;
 }
 
-int fib_recursive() {
-    return fib(6);
+int fib_recursive(int n) {
+    return fib(n);
 }
 
-int fib_iterative() {
+int fib_iterative(int n) {
     int index = 0;
     int current = 0;
     int next = 1;
 
-    while (index - 5) {
+    while (index - n) {
         int temp = current + next;
         current = next;
         next = temp;

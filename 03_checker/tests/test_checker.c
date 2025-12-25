@@ -10,8 +10,13 @@
     X(check_function_control_flow, "check function control flow") \
     X(check_function_call, "check function call") \
     X(check_binary_expression, "check binary expression") \
+    X(check_parenthesized_arithmetic, "check parenthesized arithmetic") \
+    X(check_nested_parentheses, "check nested parentheses") \
+    X(check_unary_arithmetic, "check unary arithmetic") \
     X(check_logical_expression, "check logical expression") \
     X(check_invalid_token, "check invalid token") \
+    X(check_mismatched_parentheses, "check mismatched parentheses") \
+    X(check_unexpected_closing_paren, "check unexpected closing paren") \
     X(check_missing_semicolon, "check missing semicolon") \
     X(check_expected_number, "check expected number")
 
@@ -75,6 +80,44 @@ TEST(check_binary_expression, "check binary expression")
     return 1;
 }
 
+TEST(check_parenthesized_arithmetic, "check parenthesized arithmetic")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){return (1 + 2) * (3 - 4) / 5 + 6;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_nested_parentheses, "check nested parentheses")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){return ((1 + (2 * 3)) - (4 / (5 + 6)));}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_unary_arithmetic, "check unary arithmetic")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){return -(1 + 2) + +3;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
 TEST(check_logical_expression, "check logical expression")
 {
     Checker checker;
@@ -96,6 +139,32 @@ TEST(check_invalid_token, "check invalid token")
     ASSERT_TRUE(!checker_check(&checker), "expected check failure");
     ASSERT_TRUE(test_error_contains(checker_error(&checker), "invalid"),
         "expected invalid token error");
+
+    return 1;
+}
+
+TEST(check_mismatched_parentheses, "check mismatched parentheses")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){return (1 + 2;}");
+
+    ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+    ASSERT_TRUE(test_error_contains(checker_error(&checker), "expected ')'"),
+        "expected missing ')' error");
+
+    return 1;
+}
+
+TEST(check_unexpected_closing_paren, "check unexpected closing paren")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){return );}");
+
+    ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+    ASSERT_TRUE(test_error_contains(checker_error(&checker), "unexpected ')'"),
+        "expected unexpected ')' error");
 
     return 1;
 }

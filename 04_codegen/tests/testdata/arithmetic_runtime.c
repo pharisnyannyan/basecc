@@ -21,3 +21,15 @@ int mod() {
 int mixed() {
     return (1 + 2) * 3 - 4 / 2 % 3;
 }
+
+int unary() {
+    return -(1 + 2) + +3;
+}
+
+int nested_parens() {
+    return ((1 + 2) * (3 - 4)) / (5 + 6);
+}
+
+int triple_nested() {
+    return (((1 + 2) + 3) * (4 + (5 - 6)));
+}

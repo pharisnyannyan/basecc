@@ -11,8 +11,13 @@
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
     X(parse_binary_expression, "parse binary expression") \
+    X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
+    X(parse_nested_parentheses, "parse nested parentheses") \
+    X(parse_unary_arithmetic, "parse unary arithmetic") \
     X(parse_logical_expression, "parse logical expression") \
     X(parse_invalid_token, "parse invalid token") \
+    X(parse_mismatched_parentheses, "parse mismatched parentheses") \
+    X(parse_unexpected_closing_paren, "parse unexpected closing paren") \
     X(parse_missing_semicolon, "parse missing semicolon") \
     X(parse_expected_number, "parse expected number")
 
@@ -218,6 +223,185 @@ TEST(parse_binary_expression, "parse binary expression")
     return 1;
 }
 
+TEST(parse_parenthesized_arithmetic, "parse parenthesized arithmetic")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+    ParserNode *left = NULL;
+    ParserNode *right = NULL;
+
+    parser_init(&parser,
+        "int main(){return (1 + 2) * (3 - 4) / 5 + 6;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+    expr = node->first_child
+        ->first_child
+        ->first_child
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_BINARY,
+        "expected binary expression");
+    ASSERT_TRUE(token_equals(expr->token, "+"),
+        "expected '+' operator");
+
+    left = expr->first_child;
+    right = left ? left->next : NULL;
+    ASSERT_TRUE(left != NULL, "expected left expression");
+    ASSERT_TRUE(right != NULL, "expected right expression");
+
+    ASSERT_TRUE(left->type == PARSER_NODE_BINARY,
+        "expected '/' expression");
+    ASSERT_TRUE(token_equals(left->token, "/"),
+        "expected '/' operator");
+    ASSERT_TRUE(right->type == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(right->token.value == 6, "expected number 6");
+
+    ASSERT_TRUE(left->first_child != NULL, "expected '/' left operand");
+    ASSERT_TRUE(left->first_child->type == PARSER_NODE_BINARY,
+        "expected '*' expression");
+    ASSERT_TRUE(left->first_child->next != NULL, "expected '/' right operand");
+    ASSERT_TRUE(left->first_child->next->type == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(left->first_child->next->token.value == 5, "expected number 5");
+
+    ASSERT_TRUE(left->first_child->first_child != NULL,
+        "expected '*' left operand");
+    ASSERT_TRUE(left->first_child->first_child->type == PARSER_NODE_BINARY,
+        "expected '+' expression");
+    ASSERT_TRUE(left->first_child->first_child->next != NULL,
+        "expected '*' right operand");
+    ASSERT_TRUE(left->first_child->first_child->next->type
+        == PARSER_NODE_BINARY,
+        "expected '-' expression");
+
+    ASSERT_TRUE(token_equals(left->first_child->first_child->token, "+"),
+        "expected '+' operator");
+    ASSERT_TRUE(token_equals(left->first_child->first_child->next->token, "-"),
+        "expected '-' operator");
+
+    ASSERT_TRUE(left->first_child->first_child->first_child != NULL,
+        "expected '+' left operand");
+    ASSERT_TRUE(left->first_child->first_child->first_child->type
+        == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(left->first_child->first_child->first_child->token.value == 1,
+        "expected number 1");
+    ASSERT_TRUE(left->first_child->first_child->first_child->next != NULL,
+        "expected '+' right operand");
+    ASSERT_TRUE(left->first_child->first_child->first_child->next->type
+        == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(left->first_child->first_child->first_child->next->token.value
+        == 2,
+        "expected number 2");
+
+    ASSERT_TRUE(left->first_child->first_child->next->first_child != NULL,
+        "expected '-' left operand");
+    ASSERT_TRUE(left->first_child->first_child->next->first_child->type
+        == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(left->first_child->first_child->next->first_child->token.value
+        == 3,
+        "expected number 3");
+    ASSERT_TRUE(left->first_child->first_child->next->first_child->next != NULL,
+        "expected '-' right operand");
+    ASSERT_TRUE(left->first_child->first_child->next->first_child->next->type
+        == PARSER_NODE_NUMBER,
+        "expected number expression");
+    ASSERT_TRUE(left->first_child->first_child->next->first_child->next
+        ->token.value
+        == 4,
+        "expected number 4");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_nested_parentheses, "parse nested parentheses")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+
+    parser_init(&parser,
+        "int main(){return ((1 + (2 * 3)) - (4 / (5 + 6)));}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+    expr = node->first_child
+        ->first_child
+        ->first_child
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_BINARY,
+        "expected binary expression");
+    ASSERT_TRUE(token_equals(expr->token, "-"),
+        "expected '-' operator");
+
+    ASSERT_TRUE(expr->first_child != NULL, "expected left expression");
+    ASSERT_TRUE(expr->first_child->type == PARSER_NODE_BINARY,
+        "expected '+' expression");
+    ASSERT_TRUE(expr->first_child->next != NULL, "expected right expression");
+    ASSERT_TRUE(expr->first_child->next->type == PARSER_NODE_BINARY,
+        "expected '/' expression");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_unary_arithmetic, "parse unary arithmetic")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+    ParserNode *left = NULL;
+    ParserNode *right = NULL;
+
+    parser_init(&parser, "int main(){return -(1 + 2) + +3;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+    expr = node->first_child
+        ->first_child
+        ->first_child
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_BINARY,
+        "expected binary expression");
+    ASSERT_TRUE(token_equals(expr->token, "+"),
+        "expected '+' operator");
+
+    left = expr->first_child;
+    right = left ? left->next : NULL;
+    ASSERT_TRUE(left != NULL, "expected left expression");
+    ASSERT_TRUE(right != NULL, "expected right expression");
+
+    ASSERT_TRUE(left->type == PARSER_NODE_UNARY,
+        "expected unary expression");
+    ASSERT_TRUE(token_equals(left->token, "-"),
+        "expected '-' unary operator");
+    ASSERT_TRUE(right->type == PARSER_NODE_UNARY,
+        "expected unary expression");
+    ASSERT_TRUE(token_equals(right->token, "+"),
+        "expected '+' unary operator");
+
+    ASSERT_TRUE(left->first_child != NULL, "expected unary operand");
+    ASSERT_TRUE(left->first_child->type == PARSER_NODE_BINARY,
+        "expected '+' expression");
+    ASSERT_TRUE(right->first_child != NULL, "expected unary operand");
+    ASSERT_TRUE(right->first_child->type == PARSER_NODE_NUMBER,
+        "expected number expression");
+
+    parser_free_node(node);
+    return 1;
+}
+
 TEST(parse_logical_expression, "parse logical expression")
 {
     Parser parser;
@@ -280,6 +464,42 @@ TEST(parse_invalid_token, "parse invalid token")
     ParserNode *node = parser_parse(&parser);
     ASSERT_TRUE(node != NULL, "expected parser node");
     ASSERT_TRUE(parser_error(&parser) != NULL, "expected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_INVALID,
+        "expected invalid node");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_mismatched_parentheses, "parse mismatched parentheses")
+{
+    Parser parser;
+
+    parser_init(&parser, "int main(){return (1 + 2;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) != NULL, "expected parser error");
+    ASSERT_TRUE(test_error_contains(parser_error(&parser), "expected ')'"),
+        "expected missing ')' error");
+    ASSERT_TRUE(node->type == PARSER_NODE_INVALID,
+        "expected invalid node");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_unexpected_closing_paren, "parse unexpected closing paren")
+{
+    Parser parser;
+
+    parser_init(&parser, "int main(){return );}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) != NULL, "expected parser error");
+    ASSERT_TRUE(test_error_contains(parser_error(&parser), "unexpected ')'"),
+        "expected unexpected ')' error");
     ASSERT_TRUE(node->type == PARSER_NODE_INVALID,
         "expected invalid node");
 

@@ -255,19 +255,33 @@ static int codegen_emit_expression(FunctionContext *ctx,
             return 0;
         }
 
-        if (!token_is_punct(node->token, "!")) {
-            return codegen_set_error(ctx->codegen,
-                "codegen: expected unary operator");
+        if (token_is_punct(node->token, "!")) {
+            snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
+            fprintf(ctx->out, "  %s = icmp eq i32 %s, 0\n", temp,
+                operand_value);
+
+            snprintf(result, sizeof(result), "%%t%d", ctx->next_temp_id++);
+            fprintf(ctx->out, "  %s = zext i1 %s to i32\n", result, temp);
+
+            snprintf(value, value_size, "%s", result);
+            return 1;
         }
 
-        snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
-        fprintf(ctx->out, "  %s = icmp eq i32 %s, 0\n", temp, operand_value);
+        if (token_is_punct(node->token, "+")) {
+            snprintf(value, value_size, "%s", operand_value);
+            return 1;
+        }
 
-        snprintf(result, sizeof(result), "%%t%d", ctx->next_temp_id++);
-        fprintf(ctx->out, "  %s = zext i1 %s to i32\n", result, temp);
+        if (token_is_punct(node->token, "-")) {
+            snprintf(result, sizeof(result), "%%t%d", ctx->next_temp_id++);
+            fprintf(ctx->out, "  %s = sub i32 0, %s\n", result,
+                operand_value);
+            snprintf(value, value_size, "%s", result);
+            return 1;
+        }
 
-        snprintf(value, value_size, "%s", result);
-        return 1;
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected unary operator");
     }
 
     if (node->type == PARSER_NODE_BINARY) {

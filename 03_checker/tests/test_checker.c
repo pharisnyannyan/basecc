@@ -9,6 +9,7 @@
     X(check_function_control_flow, "check function control flow") \
     X(check_function_call, "check function call") \
     X(check_binary_expression, "check binary expression") \
+    X(check_logical_expression, "check logical expression") \
     X(check_invalid_token, "check invalid token") \
     X(check_missing_semicolon, "check missing semicolon") \
     X(check_expected_number, "check expected number")
@@ -54,6 +55,18 @@ TEST(check_binary_expression, "check binary expression")
     Checker checker;
 
     checker_init(&checker, "int main(){return (8/2)+5%3 - 1;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_logical_expression, "check logical expression")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){return !1 || 0 && 2 + 3;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

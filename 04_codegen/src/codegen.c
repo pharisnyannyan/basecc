@@ -82,6 +82,101 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
 static int codegen_emit_expression(FunctionContext *ctx,
     const ParserNode *node,
     char *value,
+    size_t value_size);
+
+static void codegen_format_label(char *buffer, size_t size, const char *prefix,
+    int id);
+
+static int codegen_emit_logical_binary(FunctionContext *ctx,
+    const ParserNode *node,
+    char *value,
+    size_t value_size,
+    int is_and)
+{
+    const ParserNode *left = node->first_child;
+    const ParserNode *right = left ? left->next : NULL;
+    char left_value[32];
+    char right_value[32];
+    char left_bool[32];
+    char right_bool[32];
+    char result_bool[32];
+    char result_value[32];
+    char left_label[32];
+    char rhs_label[32];
+    char end_label[32];
+
+    if (!left || !right || right->next) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected binary operands");
+    }
+
+    codegen_format_label(left_label, sizeof(left_label), "logic.left",
+        ctx->next_label_id++);
+    codegen_format_label(rhs_label, sizeof(rhs_label), "logic.rhs",
+        ctx->next_label_id++);
+    codegen_format_label(end_label, sizeof(end_label), "logic.end",
+        ctx->next_label_id++);
+
+    fprintf(ctx->out, "  br label %%%s\n", left_label);
+    fprintf(ctx->out, "%s:\n", left_label);
+
+    if (!codegen_emit_expression(ctx, left, left_value, sizeof(left_value))) {
+        return 0;
+    }
+
+    snprintf(left_bool, sizeof(left_bool), "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", left_bool, left_value);
+
+    if (is_and) {
+        fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
+            left_bool,
+            rhs_label,
+            end_label);
+    } else {
+        fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
+            left_bool,
+            end_label,
+            rhs_label);
+    }
+
+    fprintf(ctx->out, "%s:\n", rhs_label);
+    if (!codegen_emit_expression(ctx, right, right_value,
+        sizeof(right_value))) {
+        return 0;
+    }
+
+    snprintf(right_bool, sizeof(right_bool), "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", right_bool, right_value);
+    fprintf(ctx->out, "  br label %%%s\n", end_label);
+
+    fprintf(ctx->out, "%s:\n", end_label);
+    snprintf(result_bool, sizeof(result_bool), "%%t%d", ctx->next_temp_id++);
+    if (is_and) {
+        fprintf(ctx->out, "  %s = phi i1 [0, %%%s], [%s, %%%s]\n",
+            result_bool,
+            left_label,
+            right_bool,
+            rhs_label);
+    } else {
+        fprintf(ctx->out, "  %s = phi i1 [1, %%%s], [%s, %%%s]\n",
+            result_bool,
+            left_label,
+            right_bool,
+            rhs_label);
+    }
+
+    snprintf(result_value, sizeof(result_value), "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out, "  %s = zext i1 %s to i32\n",
+        result_value,
+        result_bool);
+
+    snprintf(value, value_size, "%s", result_value);
+    return 1;
+}
+
+static int codegen_emit_expression(FunctionContext *ctx,
+    const ParserNode *node,
+    char *value,
     size_t value_size)
 {
     if (node->type == PARSER_NODE_NUMBER) {
@@ -118,6 +213,37 @@ static int codegen_emit_expression(FunctionContext *ctx,
         return 1;
     }
 
+    if (node->type == PARSER_NODE_UNARY) {
+        const ParserNode *operand = node->first_child;
+        char operand_value[32];
+        char temp[32];
+        char result[32];
+
+        if (!operand || operand->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected unary operand");
+        }
+
+        if (!codegen_emit_expression(ctx, operand, operand_value,
+            sizeof(operand_value))) {
+            return 0;
+        }
+
+        if (!token_is_punct(node->token, "!")) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected unary operator");
+        }
+
+        snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = icmp eq i32 %s, 0\n", temp, operand_value);
+
+        snprintf(result, sizeof(result), "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = zext i1 %s to i32\n", result, temp);
+
+        snprintf(value, value_size, "%s", result);
+        return 1;
+    }
+
     if (node->type == PARSER_NODE_BINARY) {
         const ParserNode *left = node->first_child;
         const ParserNode *right = left ? left->next : NULL;
@@ -128,6 +254,16 @@ static int codegen_emit_expression(FunctionContext *ctx,
         if (!left || !right || right->next) {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected binary operands");
+        }
+
+        if (token_is_punct(node->token, "&&")) {
+            return codegen_emit_logical_binary(ctx, node, value,
+                value_size, 1);
+        }
+
+        if (token_is_punct(node->token, "||")) {
+            return codegen_emit_logical_binary(ctx, node, value,
+                value_size, 0);
         }
 
         if (!codegen_emit_expression(ctx, left, left_value,

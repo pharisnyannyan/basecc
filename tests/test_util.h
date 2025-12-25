@@ -1,12 +1,27 @@
 #ifndef BASECC_TEST_UTIL_H
 #define BASECC_TEST_UTIL_H
 
+#include <stddef.h>
 #include <string.h>
+
+typedef int (*TestFn)(void);
+
+typedef struct {
+    const char *name;
+    TestFn fn;
+} TestCase;
+
+void test_begin(const char *name);
+void test_failf(const char *fmt, ...);
+int test_run(const TestCase *tests, size_t count);
+int test_error_contains(const char *error, const char *text);
+
+#define failf test_failf
 
 #define ASSERT_TRUE(expr, message) \
     do { \
         if (!(expr)) { \
-            failf("%s", message); \
+            test_failf("%s", message); \
             return 0; \
         } \
     } while (0)
@@ -14,7 +29,7 @@
 #define ASSERT_TRUEF(expr, fmt, ...) \
     do { \
         if (!(expr)) { \
-            failf(fmt, __VA_ARGS__); \
+            test_failf(fmt, __VA_ARGS__); \
             return 0; \
         } \
     } while (0)

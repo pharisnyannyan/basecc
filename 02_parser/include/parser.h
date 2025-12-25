@@ -5,13 +5,19 @@
 
 typedef enum ParserNodeType {
     PARSER_NODE_TRANSLATION_UNIT = 0,
+    PARSER_NODE_DECLARATION,
+    PARSER_NODE_NUMBER,
     PARSER_NODE_INVALID
 } ParserNodeType;
 
-typedef struct ParserNode {
+typedef struct ParserNode ParserNode;
+
+struct ParserNode {
     ParserNodeType type;
     Token token;
-} ParserNode;
+    ParserNode *first_child;
+    ParserNode *next;
+};
 
 typedef struct Parser {
     Lexer lexer;

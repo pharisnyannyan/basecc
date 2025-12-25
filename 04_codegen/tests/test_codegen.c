@@ -89,9 +89,9 @@ typedef struct {
     const char *name;
     const char *input_path;
     const char *expected_path;
-} CodegenFixture;
+} CodegenTestdata;
 
-static int run_codegen_fixture(const CodegenFixture *fixture)
+static int run_codegen_testdata(const CodegenTestdata *testdata)
 {
     Codegen codegen;
     char output[256];
@@ -100,19 +100,19 @@ static int run_codegen_fixture(const CodegenFixture *fixture)
     char *content = NULL;
     int passed = 0;
 
-    source = read_file(fixture->input_path);
+    source = read_file(testdata->input_path);
     if (!source) {
-        failf("expected fixture input");
+        failf("expected testdata input");
         goto cleanup;
     }
 
-    expected = read_file(fixture->expected_path);
+    expected = read_file(testdata->expected_path);
     if (!expected) {
-        failf("expected fixture output");
+        failf("expected testdata output");
         goto cleanup;
     }
 
-    snprintf(output, sizeof(output), "build/%s.ll", fixture->name);
+    snprintf(output, sizeof(output), "build/%s.ll", testdata->name);
 
     codegen_init(&codegen, source);
 
@@ -146,20 +146,20 @@ cleanup:
 
 TEST(generate_simple_module, "generate simple module")
 {
-    CodegenFixture fixture = {
+    CodegenTestdata testdata = {
         "codegen_simple",
-        "tests/fixtures/simple_module.c",
-        "tests/fixtures/simple_module.ll"
+    return run_codegen_testdata(&testdata);
+    CodegenTestdata testdata = {
     };
 
-    return run_codegen_fixture(&fixture);
+    return run_codegen_testdata(&testdata);
 }
 
-TEST(generate_defaults, "generate default initializers")
-{
-    CodegenFixture fixture = {
-        "codegen_defaults",
-        "tests/fixtures/defaults.c",
+    CodegenTestdata testdata = {
+    return run_codegen_testdata(&testdata);
+    CodegenTestdata testdata = {
+    return run_codegen_testdata(&testdata);
+        failf("expected testdata input");
         "tests/fixtures/defaults.ll"
     };
 

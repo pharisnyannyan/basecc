@@ -1,1 +1,2 @@
-int value = ;
+int value =
+    ;

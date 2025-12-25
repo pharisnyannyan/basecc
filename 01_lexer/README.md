@@ -7,7 +7,7 @@ minimal by design and focuses on clarity over completeness.
 - identifiers: `[A-Za-z_][A-Za-z0-9_]*`
 - numbers: decimal integers
 - punctuators: `+ - * / ( ) { } ; , == != =`
-- keywords: `if else while switch case int`
+- keywords: `if else while switch case int short char`
 - invalid: any unsupported single character
 - end-of-file marker
 

@@ -23,6 +23,10 @@ static const char *token_type_name(TokenType type)
         return "TOKEN_SWITCH";
     case TOKEN_CASE:
         return "TOKEN_CASE";
+    case TOKEN_CHAR:
+        return "TOKEN_CHAR";
+    case TOKEN_SHORT:
+        return "TOKEN_SHORT";
     case TOKEN_INT:
         return "TOKEN_INT";
     case TOKEN_INVALID:

@@ -11,6 +11,8 @@
     X(generate_simple_module, "generate simple module") \
     X(generate_type_declarations, "generate type declarations") \
     X(generate_defaults, "generate default initializers") \
+    X(generate_pointer_globals, "generate pointer globals") \
+    X(generate_pointer_return, "generate pointer return") \
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_function_call, "generate function call") \
     X(generate_arithmetic_function, "generate arithmetic function") \
@@ -193,6 +195,28 @@ TEST(generate_defaults, "generate default initializers")
         "codegen_defaults",
         "tests/testdata/defaults.c",
         "tests/testdata/defaults.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_pointer_globals, "generate pointer globals")
+{
+    CodegenFixture fixture = {
+        "codegen_pointers",
+        "tests/testdata/pointer_globals.c",
+        "tests/testdata/pointer_globals.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_pointer_return, "generate pointer return")
+{
+    CodegenFixture fixture = {
+        "codegen_pointer_return",
+        "tests/testdata/pointer_return.c",
+        "tests/testdata/pointer_return.ll"
     };
 
     return run_codegen_fixture(&fixture);

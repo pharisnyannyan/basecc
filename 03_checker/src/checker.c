@@ -69,7 +69,9 @@ static int checker_validate_unary_operator(Checker *checker, Token token)
 {
     if (token_is_punct(token, "!")
         || token_is_punct(token, "+")
-        || token_is_punct(token, "-")) {
+        || token_is_punct(token, "-")
+        || token_is_punct(token, "*")
+        || token_is_punct(token, "&")) {
         return 1;
     }
 
@@ -100,6 +102,20 @@ static int checker_validate_expression(Checker *checker,
             if (!checker_validate_expression(checker, child)) {
                 return 0;
             }
+        }
+
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_IDENTIFIER) {
+        if (node->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected identifier");
+        }
+
+        if (node->first_child) {
+            return checker_set_error(checker,
+                "checker: unexpected identifier children");
         }
 
         return 1;
@@ -240,7 +256,7 @@ static int checker_validate_declaration(Checker *checker,
                 "checker: unexpected initializer list");
         }
 
-        if (!checker_validate_number(checker, node->first_child)) {
+        if (!checker_validate_expression(checker, node->first_child)) {
             return 0;
         }
     }

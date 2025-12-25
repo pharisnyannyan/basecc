@@ -26,6 +26,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
     node->type = type;
     node->token = token;
     node->type_token = token;
+    node->pointer_depth = 0;
     node->first_child = NULL;
     node->next = NULL;
 }
@@ -172,7 +173,11 @@ static ParserNode *parser_parse_primary(Parser *parser)
 
     if (token.type == TOKEN_IDENT) {
         parser_next(parser);
-        return parser_parse_call(parser, token);
+        if (token_is_punct(parser->last_token, "(")) {
+            return parser_parse_call(parser, token);
+        }
+
+        return parser_alloc_node(parser, PARSER_NODE_IDENTIFIER, token);
     }
 
     if (token_is_punct(token, "(")) {
@@ -213,7 +218,9 @@ static ParserNode *parser_parse_unary(Parser *parser)
 
     if (token_is_punct(token, "!")
         || token_is_punct(token, "+")
-        || token_is_punct(token, "-")) {
+        || token_is_punct(token, "-")
+        || token_is_punct(token, "*")
+        || token_is_punct(token, "&")) {
         ParserNode *node = NULL;
         ParserNode *operand = NULL;
 
@@ -662,6 +669,7 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
 static ParserNode *parser_parse_external(Parser *parser)
 {
     Token token = parser->last_token;
+    int pointer_depth = 0;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
@@ -676,6 +684,12 @@ static ParserNode *parser_parse_external(Parser *parser)
     parser_next(parser);
     token = parser->last_token;
 
+    while (token_is_punct(token, "*")) {
+        pointer_depth++;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -687,10 +701,19 @@ static ParserNode *parser_parse_external(Parser *parser)
     parser_next(parser);
 
     if (token_is_punct(parser->last_token, "(")) {
-        return parser_parse_function(parser, token, type_token);
+        ParserNode *function = parser_parse_function(parser, token, type_token);
+        if (function && function->type != PARSER_NODE_INVALID) {
+            function->pointer_depth = pointer_depth;
+        }
+        return function;
     }
 
-    return parser_parse_declaration(parser, token, type_token);
+    ParserNode *declaration = parser_parse_declaration(parser, token,
+        type_token);
+    if (declaration && declaration->type != PARSER_NODE_INVALID) {
+        declaration->pointer_depth = pointer_depth;
+    }
+    return declaration;
 }
 
 ParserNode *parser_parse(Parser *parser)

@@ -8,6 +8,7 @@
 #define TEST_LIST(X) \
     X(parse_translation_unit, "parse translation unit") \
     X(parse_type_declarations, "parse type declarations") \
+    X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
     X(parse_binary_expression, "parse binary expression") \
@@ -91,6 +92,49 @@ TEST(parse_type_declarations, "parse type declarations")
         "expected initializer");
     ASSERT_TRUE(node->first_child->next->first_child->token.value == 7,
         "expected initializer value 7");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_pointer_declaration, "parse pointer declaration")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+
+    parser_init(&parser, "int value; int *ptr = &value; int main(){return *ptr;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+    ASSERT_TRUE(node->first_child != NULL, "expected first declaration");
+    ASSERT_TRUE(node->first_child->next != NULL, "expected second declaration");
+    ASSERT_TRUE(node->first_child->next->type == PARSER_NODE_DECLARATION,
+        "expected pointer declaration");
+    ASSERT_TRUE(node->first_child->next->pointer_depth == 1,
+        "expected pointer depth");
+    ASSERT_TRUE(node->first_child->next->first_child != NULL,
+        "expected pointer initializer");
+    ASSERT_TRUE(node->first_child->next->first_child->type
+        == PARSER_NODE_UNARY,
+        "expected unary initializer");
+    ASSERT_TRUE(token_equals(node->first_child->next->first_child->token, "&"),
+        "expected address-of initializer");
+
+    expr = node->first_child->next->next
+        ->first_child
+        ->first_child
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_UNARY,
+        "expected dereference expression");
+    ASSERT_TRUE(token_equals(expr->token, "*"),
+        "expected dereference operator");
+    ASSERT_TRUE(expr->first_child != NULL, "expected dereference operand");
+    ASSERT_TRUE(expr->first_child->type == PARSER_NODE_IDENTIFIER,
+        "expected identifier operand");
 
     parser_free_node(node);
     return 1;

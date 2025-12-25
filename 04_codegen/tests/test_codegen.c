@@ -167,8 +167,8 @@ TEST(generate_simple_module, "generate simple module")
 {
     CodegenFixture fixture = {
         "codegen_simple",
-        "tests/fixtures/simple_module.c",
-        "tests/fixtures/simple_module.ll"
+        "tests/testdata/simple_module.c",
+        "tests/testdata/simple_module.ll"
     };
 
     return run_codegen_fixture(&fixture);
@@ -178,8 +178,8 @@ TEST(generate_defaults, "generate default initializers")
 {
     CodegenFixture fixture = {
         "codegen_defaults",
-        "tests/fixtures/defaults.c",
-        "tests/fixtures/defaults.ll"
+        "tests/testdata/defaults.c",
+        "tests/testdata/defaults.ll"
     };
 
     return run_codegen_fixture(&fixture);
@@ -189,8 +189,8 @@ TEST(generate_control_flow_function, "generate control flow function")
 {
     CodegenFixture fixture = {
         "codegen_control_flow",
-        "tests/fixtures/control_flow.c",
-        "tests/fixtures/control_flow.ll"
+        "tests/testdata/control_flow.c",
+        "tests/testdata/control_flow.ll"
     };
 
     return run_codegen_fixture(&fixture);
@@ -200,8 +200,8 @@ TEST(generate_function_call, "generate function call")
 {
     CodegenFixture fixture = {
         "codegen_function_call",
-        "tests/fixtures/function_call.c",
-        "tests/fixtures/function_call.ll"
+        "tests/testdata/function_call.c",
+        "tests/testdata/function_call.ll"
     };
 
     return run_codegen_fixture(&fixture);
@@ -211,8 +211,8 @@ TEST(generate_arithmetic_function, "generate arithmetic function")
 {
     CodegenFixture fixture = {
         "codegen_arithmetic",
-        "testdata/arithmetic_runtime.c",
-        "testdata/arithmetic_runtime.ll"
+        "tests/testdata/arithmetic_runtime.c",
+        "tests/testdata/arithmetic_runtime.ll"
     };
 
     return run_codegen_fixture(&fixture);
@@ -223,7 +223,7 @@ TEST(check_invalid_syntax, "reject invalid syntax")
     Codegen codegen;
     char *source = NULL;
 
-    source = read_file("tests/fixtures/invalid_syntax.c", NULL);
+    source = read_file("tests/testdata/invalid_syntax.c", NULL);
     if (!source) {
         failf("expected fixture input");
         return 0;

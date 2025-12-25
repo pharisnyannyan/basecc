@@ -84,7 +84,30 @@ static Token lex_identifier(Lexer *lexer)
         lexer->pos++;
     }
 
-    return make_token(TOKEN_IDENT, lexer->input + start, lexer->pos - start);
+    size_t length = lexer->pos - start;
+    const char *text = lexer->input + start;
+
+    if (length == 2 && strncmp(text, "if", 2) == 0) {
+        return make_token(TOKEN_IF, text, length);
+    }
+
+    if (length == 4 && strncmp(text, "else", 4) == 0) {
+        return make_token(TOKEN_ELSE, text, length);
+    }
+
+    if (length == 5 && strncmp(text, "while", 5) == 0) {
+        return make_token(TOKEN_WHILE, text, length);
+    }
+
+    if (length == 6 && strncmp(text, "switch", 6) == 0) {
+        return make_token(TOKEN_SWITCH, text, length);
+    }
+
+    if (length == 4 && strncmp(text, "case", 4) == 0) {
+        return make_token(TOKEN_CASE, text, length);
+    }
+
+    return make_token(TOKEN_IDENT, text, length);
 }
 
 static Token lex_punctuator(Lexer *lexer)

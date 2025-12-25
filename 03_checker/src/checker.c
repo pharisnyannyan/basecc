@@ -36,7 +36,33 @@ static int checker_validate_number(Checker *checker, const ParserNode *node)
 static int checker_validate_expression(Checker *checker,
     const ParserNode *node)
 {
-    return checker_validate_number(checker, node);
+    const ParserNode *child = NULL;
+
+    if (node->type == PARSER_NODE_NUMBER) {
+        return checker_validate_number(checker, node);
+    }
+
+    if (node->type == PARSER_NODE_CALL) {
+        if (node->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected function identifier");
+        }
+
+        if (node->first_child) {
+            return checker_set_error(checker,
+                "checker: arguments not supported");
+        }
+
+        for (child = node->first_child; child; child = child->next) {
+            if (!checker_validate_expression(checker, child)) {
+                return 0;
+            }
+        }
+
+        return 1;
+    }
+
+    return checker_set_error(checker, "checker: expected expression");
 }
 
 static int checker_validate_statement(Checker *checker,

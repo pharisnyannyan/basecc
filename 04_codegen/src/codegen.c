@@ -66,25 +66,45 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
 
 static int codegen_emit_expression(FunctionContext *ctx,
     const ParserNode *node,
-    long *value)
+    char *value,
+    size_t value_size)
 {
-    if (node->type != PARSER_NODE_NUMBER) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected number expression");
+    if (node->type == PARSER_NODE_NUMBER) {
+        if (node->token.type != TOKEN_NUMBER) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected number token");
+        }
+
+        if (node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unexpected expression child");
+        }
+
+        snprintf(value, value_size, "%ld", node->token.value);
+        return 1;
     }
 
-    if (node->token.type != TOKEN_NUMBER) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected number token");
+    if (node->type == PARSER_NODE_CALL) {
+        if (node->token.type != TOKEN_IDENT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected call identifier");
+        }
+
+        if (node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: arguments not supported");
+        }
+
+        snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = call i32 @%.*s()\n",
+            value,
+            (int)node->token.length,
+            node->token.start);
+        return 1;
     }
 
-    if (node->first_child) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: unexpected expression child");
-    }
-
-    *value = node->token.value;
-    return 1;
+    return codegen_set_error(ctx->codegen,
+        "codegen: expected expression");
 }
 
 static void codegen_format_label(char *buffer, size_t size, const char *prefix,
@@ -124,7 +144,7 @@ static int codegen_emit_if(FunctionContext *ctx, const ParserNode *node)
     const ParserNode *condition = node->first_child;
     const ParserNode *then_branch = condition ? condition->next : NULL;
     const ParserNode *else_branch = then_branch ? then_branch->next : NULL;
-    long value = 0;
+    char value[32];
     char temp[32];
     char then_label[32];
     char else_label[32];
@@ -143,7 +163,7 @@ static int codegen_emit_if(FunctionContext *ctx, const ParserNode *node)
             "codegen: unexpected else statement");
     }
 
-    if (!codegen_emit_expression(ctx, condition, &value)) {
+    if (!codegen_emit_expression(ctx, condition, value, sizeof(value))) {
         return 0;
     }
 
@@ -163,7 +183,7 @@ static int codegen_emit_if(FunctionContext *ctx, const ParserNode *node)
         else_label[sizeof(else_label) - 1] = '\0';
     }
 
-    fprintf(ctx->out, "  %s = icmp ne i32 %ld, 0\n", temp, value);
+    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
     fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
         temp,
         then_label,
@@ -205,7 +225,7 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
 {
     const ParserNode *condition = node->first_child;
     const ParserNode *body = condition ? condition->next : NULL;
-    long value = 0;
+    char value[32];
     char temp[32];
     char cond_label[32];
     char body_label[32];
@@ -222,7 +242,7 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
             "codegen: unexpected while statement");
     }
 
-    if (!codegen_emit_expression(ctx, condition, &value)) {
+    if (!codegen_emit_expression(ctx, condition, value, sizeof(value))) {
         return 0;
     }
 
@@ -237,7 +257,7 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
     fprintf(ctx->out, "%s:\n", cond_label);
 
     snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
-    fprintf(ctx->out, "  %s = icmp ne i32 %ld, 0\n", temp, value);
+    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
     fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
         temp,
         body_label,
@@ -258,7 +278,7 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
 
 static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
 {
-    long value = 0;
+    char value[32];
 
     switch (node->type) {
     case PARSER_NODE_BLOCK:
@@ -273,11 +293,12 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                 "codegen: unexpected return statement");
         }
 
-        if (!codegen_emit_expression(ctx, node->first_child, &value)) {
+        if (!codegen_emit_expression(ctx, node->first_child, value,
+            sizeof(value))) {
             return 0;
         }
 
-        fprintf(ctx->out, "  ret i32 %ld\n", value);
+        fprintf(ctx->out, "  ret i32 %s\n", value);
         return 1;
     case PARSER_NODE_EMPTY:
         if (node->first_child) {

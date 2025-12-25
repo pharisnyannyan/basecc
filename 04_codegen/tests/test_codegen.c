@@ -33,6 +33,7 @@ static void failf(const char *fmt, ...)
     X(generate_simple_module, "generate simple module") \
     X(generate_defaults, "generate default initializers") \
     X(generate_control_flow_function, "generate control flow function") \
+    X(generate_function_call, "generate function call") \
     X(check_invalid_syntax, "reject invalid syntax")
 
 static int error_contains(const char *error, const char *text)
@@ -179,6 +180,40 @@ TEST(generate_control_flow_function, "generate control flow function")
     return 1;
 }
 
+TEST(generate_function_call, "generate function call")
+{
+    Codegen codegen;
+    const char *output = "build/test_codegen_call.ll";
+    const char *expected =
+        "; ModuleID = 'basecc'\n"
+        "source_filename = \"basecc\"\n\n"
+        "define i32 @foo() {\n"
+        "entry:\n"
+        "  ret i32 7\n"
+        "}\n"
+        "define i32 @main() {\n"
+        "entry:\n"
+        "  %t0 = call i32 @foo()\n"
+        "  ret i32 %t0\n"
+        "}\n";
+    char *content = NULL;
+
+    codegen_init(&codegen, "int foo(){return 7;} int main(){return foo();}");
+
+    ASSERT_TRUE(codegen_emit(&codegen, output),
+        "expected codegen success");
+    ASSERT_TRUE(codegen_error(&codegen) == NULL,
+        "unexpected codegen error");
+
+    content = read_file(output);
+    ASSERT_TRUE(content != NULL, "expected output file content");
+    ASSERT_TRUE(strcmp(content, expected) == 0,
+        "unexpected LLVM IR output");
+
+    free(content);
+    return 1;
+}
+
 TEST(check_invalid_syntax, "reject invalid syntax")
 {
     Codegen codegen;
@@ -187,8 +222,8 @@ TEST(check_invalid_syntax, "reject invalid syntax")
 
     ASSERT_TRUE(!codegen_emit(&codegen, "build/test_codegen_invalid.ll"),
         "expected codegen failure");
-    ASSERT_TRUE(error_contains(codegen_error(&codegen), "expected number"),
-        "expected number error");
+    ASSERT_TRUE(error_contains(codegen_error(&codegen), "expected expression"),
+        "expected expression error");
 
     return 1;
 }

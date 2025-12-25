@@ -31,6 +31,7 @@ static void failf(const char *fmt, ...)
 #define TEST_LIST(X) \
     X(check_translation_unit, "check translation unit") \
     X(check_function_control_flow, "check function control flow") \
+    X(check_function_call, "check function call") \
     X(check_invalid_token, "check invalid token") \
     X(check_missing_semicolon, "check missing semicolon") \
     X(check_expected_number, "check expected number")
@@ -61,6 +62,18 @@ TEST(check_function_control_flow, "check function control flow")
     Checker checker;
 
     checker_init(&checker, "int main(){while(0);if(1){return 2;}else{return 3;}}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_function_call, "check function call")
+{
+    Checker checker;
+
+    checker_init(&checker, "int foo(){return 1;} int main(){return foo();}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -101,8 +114,8 @@ TEST(check_expected_number, "check expected number")
     checker_init(&checker, "int value = ;");
 
     ASSERT_TRUE(!checker_check(&checker), "expected check failure");
-    ASSERT_TRUE(error_contains(checker_error(&checker), "expected number"),
-        "expected number error");
+    ASSERT_TRUE(error_contains(checker_error(&checker), "expected expression"),
+        "expected expression error");
 
     return 1;
 }

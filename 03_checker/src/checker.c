@@ -67,7 +67,9 @@ static int checker_validate_binary_operator(Checker *checker, Token token)
 
 static int checker_validate_unary_operator(Checker *checker, Token token)
 {
-    if (token_is_punct(token, "!")) {
+    if (token_is_punct(token, "!")
+        || token_is_punct(token, "+")
+        || token_is_punct(token, "-")) {
         return 1;
     }
 

@@ -195,6 +195,11 @@ static ParserNode *parser_parse_primary(Parser *parser)
         return expr;
     }
 
+    if (token_is_punct(token, ")")) {
+        return parser_make_error(parser, token,
+            "parser: unexpected ')'");
+    }
+
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -206,7 +211,9 @@ static ParserNode *parser_parse_unary(Parser *parser)
 {
     Token token = parser->last_token;
 
-    if (token_is_punct(token, "!")) {
+    if (token_is_punct(token, "!")
+        || token_is_punct(token, "+")
+        || token_is_punct(token, "-")) {
         ParserNode *node = NULL;
         ParserNode *operand = NULL;
 

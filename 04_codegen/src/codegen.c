@@ -8,7 +8,14 @@ typedef struct FunctionContext {
     FILE *out;
     int next_label_id;
     int next_temp_id;
+    const char *return_type;
+    int return_width;
 } FunctionContext;
+
+typedef struct TypeInfo {
+    const char *ir_name;
+    int width;
+} TypeInfo;
 
 static int token_is_punct(Token token, const char *text)
 {
@@ -23,6 +30,21 @@ static int token_is_punct(Token token, const char *text)
     }
 
     return strncmp(token.start, text, length) == 0;
+}
+
+static TypeInfo codegen_type_info(Token token)
+{
+    TypeInfo info = { "i32", 32 };
+
+    if (token.type == TOKEN_CHAR) {
+        info.ir_name = "i8";
+        info.width = 8;
+    } else if (token.type == TOKEN_SHORT) {
+        info.ir_name = "i16";
+        info.width = 16;
+    }
+
+    return info;
 }
 
 static int codegen_set_error(Codegen *codegen, const char *message)
@@ -46,6 +68,7 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
     FILE *out)
 {
     long value = 0;
+    TypeInfo type_info;
 
     if (node->type != PARSER_NODE_DECLARATION) {
         return codegen_set_error(codegen,
@@ -71,9 +94,12 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
         value = node->first_child->token.value;
     }
 
-    fprintf(out, "@%.*s = global i32 %ld\n",
+    type_info = codegen_type_info(node->type_token);
+
+    fprintf(out, "@%.*s = global %s %ld\n",
         (int)node->token.length,
         node->token.start,
+        type_info.ir_name,
         value);
 
     return 1;
@@ -473,6 +499,7 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
 static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
 {
     char value[32];
+    char cast_value[32];
 
     switch (node->type) {
     case PARSER_NODE_BLOCK:
@@ -492,7 +519,17 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             return 0;
         }
 
-        fprintf(ctx->out, "  ret i32 %s\n", value);
+        if (ctx->return_width == 32) {
+            fprintf(ctx->out, "  ret i32 %s\n", value);
+            return 1;
+        }
+
+        snprintf(cast_value, sizeof(cast_value), "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+            cast_value,
+            value,
+            ctx->return_type);
+        fprintf(ctx->out, "  ret %s %s\n", ctx->return_type, cast_value);
         return 1;
     case PARSER_NODE_EMPTY:
         if (node->first_child) {
@@ -511,6 +548,7 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
 {
     FunctionContext ctx;
     int terminated = 0;
+    TypeInfo type_info;
 
     if (node->type != PARSER_NODE_FUNCTION) {
         return codegen_set_error(codegen,
@@ -536,8 +574,12 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     ctx.out = out;
     ctx.next_label_id = 0;
     ctx.next_temp_id = 0;
+    type_info = codegen_type_info(node->type_token);
+    ctx.return_type = type_info.ir_name;
+    ctx.return_width = type_info.width;
 
-    fprintf(out, "define i32 @%.*s() {\n",
+    fprintf(out, "define %s @%.*s() {\n",
+        ctx.return_type,
         (int)node->token.length,
         node->token.start);
     fprintf(out, "entry:\n");
@@ -548,7 +590,7 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     }
 
     if (!terminated) {
-        fprintf(out, "  ret i32 0\n");
+        fprintf(out, "  ret %s 0\n", ctx.return_type);
     }
 
     fprintf(out, "}\n");

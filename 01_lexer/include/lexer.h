@@ -14,6 +14,8 @@ typedef enum TokenType {
     TOKEN_SWITCH,
     TOKEN_CASE,
     TOKEN_RETURN,
+    TOKEN_CHAR,
+    TOKEN_SHORT,
     TOKEN_INT,
     TOKEN_INVALID = 1000 /* keep stable value for compatibility */
 } TokenType;

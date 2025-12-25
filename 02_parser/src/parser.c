@@ -25,6 +25,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
 {
     node->type = type;
     node->token = token;
+    node->type_token = token;
     node->first_child = NULL;
     node->next = NULL;
 }
@@ -42,6 +43,13 @@ static int token_is_punct(Token token, const char *text)
     }
 
     return strncmp(token.start, text, length) == 0;
+}
+
+static int token_is_type(Token token)
+{
+    return token.type == TOKEN_INT
+        || token.type == TOKEN_SHORT
+        || token.type == TOKEN_CHAR;
 }
 
 static ParserNode *parser_alloc_node(Parser *parser, ParserNodeType type,
@@ -576,13 +584,16 @@ static ParserNode *parser_parse_statement(Parser *parser)
     return parser_make_error(parser, token, "parser: expected statement");
 }
 
-static ParserNode *parser_parse_declaration(Parser *parser, Token name_token)
+static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
+    Token type_token)
 {
     ParserNode *node = parser_alloc_node(parser, PARSER_NODE_DECLARATION,
         name_token);
     if (!node) {
         return NULL;
     }
+
+    node->type_token = type_token;
 
     if (parser_match_punct(parser, "=")) {
         ParserNode *init = parser_parse_expression(parser);
@@ -606,7 +617,8 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token)
     return node;
 }
 
-static ParserNode *parser_parse_function(Parser *parser, Token name_token)
+static ParserNode *parser_parse_function(Parser *parser, Token name_token,
+    Token type_token)
 {
     if (!parser_match_punct(parser, "(")) {
         return parser_make_error(parser, parser->last_token,
@@ -635,6 +647,7 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token)
         return NULL;
     }
 
+    node->type_token = type_token;
     node->first_child = body;
     return node;
 }
@@ -647,9 +660,11 @@ static ParserNode *parser_parse_external(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (token.type != TOKEN_INT) {
-        return parser_make_error(parser, token, "parser: expected 'int'");
+    if (!token_is_type(token)) {
+        return parser_make_error(parser, token, "parser: expected type");
     }
+
+    Token type_token = token;
 
     parser_next(parser);
     token = parser->last_token;
@@ -665,10 +680,10 @@ static ParserNode *parser_parse_external(Parser *parser)
     parser_next(parser);
 
     if (token_is_punct(parser->last_token, "(")) {
-        return parser_parse_function(parser, token);
+        return parser_parse_function(parser, token, type_token);
     }
 
-    return parser_parse_declaration(parser, token);
+    return parser_parse_declaration(parser, token, type_token);
 }
 
 ParserNode *parser_parse(Parser *parser)

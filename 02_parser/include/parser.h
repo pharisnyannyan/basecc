@@ -24,6 +24,7 @@ typedef struct ParserNode ParserNode;
 struct ParserNode {
     ParserNodeType type;
     Token token;
+    Token type_token;
     ParserNode *first_child;
     ParserNode *next;
 };

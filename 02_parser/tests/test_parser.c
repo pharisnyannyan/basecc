@@ -7,6 +7,7 @@
 
 #define TEST_LIST(X) \
     X(parse_translation_unit, "parse translation unit") \
+    X(parse_type_declarations, "parse type declarations") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
     X(parse_binary_expression, "parse binary expression") \
@@ -53,6 +54,36 @@ TEST(parse_translation_unit, "parse translation unit")
     ASSERT_TRUE(node->first_child->next->first_child->type
         == PARSER_NODE_NUMBER,
         "expected number initializer");
+    ASSERT_TRUE(node->first_child->next->first_child->token.value == 7,
+        "expected initializer value 7");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_type_declarations, "parse type declarations")
+{
+    Parser parser;
+
+    parser_init(&parser, "short main; char value = 7;");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+    ASSERT_TRUE(node->first_child != NULL, "expected first declaration");
+    ASSERT_TRUE(token_equals(node->first_child->token, "main"),
+        "expected declaration name 'main'");
+    ASSERT_TRUE(node->first_child->type_token.type == TOKEN_SHORT,
+        "expected short type token");
+    ASSERT_TRUE(node->first_child->next != NULL, "expected second declaration");
+    ASSERT_TRUE(token_equals(node->first_child->next->token, "value"),
+        "expected declaration name 'value'");
+    ASSERT_TRUE(node->first_child->next->type_token.type == TOKEN_CHAR,
+        "expected char type token");
+    ASSERT_TRUE(node->first_child->next->first_child != NULL,
+        "expected initializer");
     ASSERT_TRUE(node->first_child->next->first_child->token.value == 7,
         "expected initializer value 7");
 

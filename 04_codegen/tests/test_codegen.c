@@ -9,6 +9,7 @@
 
 #define TEST_LIST(X) \
     X(generate_simple_module, "generate simple module") \
+    X(generate_type_declarations, "generate type declarations") \
     X(generate_defaults, "generate default initializers") \
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_function_call, "generate function call") \
@@ -170,6 +171,17 @@ TEST(generate_simple_module, "generate simple module")
         "codegen_simple",
         "tests/testdata/simple_module.c",
         "tests/testdata/simple_module.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_type_declarations, "generate type declarations")
+{
+    CodegenFixture fixture = {
+        "codegen_types",
+        "tests/testdata/type_keywords.c",
+        "tests/testdata/type_keywords.ll"
     };
 
     return run_codegen_fixture(&fixture);

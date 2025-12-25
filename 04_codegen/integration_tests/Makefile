@@ -8,6 +8,9 @@ BUILD_DIR := build
 LL := ../build/codegen_arithmetic.ll
 INPUT := ../tests/testdata/arithmetic_runtime.c
 EXPECTED := arithmetic_driver_expected.txt
+FIB_LL := ../build/codegen_fibonacci.ll
+FIB_INPUT := ../tests/testdata/fibonacci.c
+FIB_EXPECTED := fibonacci_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -20,23 +23,30 @@ OBJ := $(BUILD_DIR)/arithmetic.o
 BIN := $(BUILD_DIR)/arithmetic_driver
 DRIVER := arithmetic_driver.c
 OUTPUT := $(BUILD_DIR)/arithmetic_output.txt
+FIB_OBJ := $(BUILD_DIR)/fibonacci.o
+FIB_BIN := $(BUILD_DIR)/fibonacci_driver
+FIB_DRIVER := fibonacci_driver.c
+FIB_OUTPUT := $(BUILD_DIR)/fibonacci_output.txt
 
 .PHONY: all compile generate run verify clean
 
-all: $(BIN)
+all: $(BIN) $(FIB_BIN)
 
-generate: $(LL)
+generate: $(LL) $(FIB_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
 
-compile: generate $(OBJ)
+$(FIB_LL): $(CODEGEN_BIN) $(FIB_INPUT)
+	./$(CODEGEN_BIN) $(FIB_INPUT) $(FIB_LL)
 
-run: all
-	./$(BIN) > $(OUTPUT)
+compile: generate $(OBJ) $(FIB_OBJ)
+
+run: all $(OUTPUT) $(FIB_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
+	cmp -s $(FIB_OUTPUT) $(FIB_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -49,8 +59,20 @@ $(CODEGEN_BIN): $(CODEGEN_SRC) $(CODEGEN_LIB) $(CHECKER_LIB) \
 $(OBJ): $(LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(LL) -o $(OBJ)
 
+$(FIB_OBJ): $(FIB_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(FIB_LL) -o $(FIB_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
+
+$(FIB_BIN): $(FIB_OBJ) $(FIB_DRIVER)
+	$(CC) $(CFLAGS) -o $(FIB_BIN) $(FIB_DRIVER) $(FIB_OBJ)
+
+$(OUTPUT): $(BIN)
+	./$(BIN) > $(OUTPUT)
+
+$(FIB_OUTPUT): $(FIB_BIN)
+	./$(FIB_BIN) > $(FIB_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

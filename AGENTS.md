@@ -20,6 +20,7 @@ These guidelines apply to the entire repository.
 - Tests should be small, explicit, and behavior-focused.
 - Prefer minimal C tests, shell scripts, or small Python scripts (standard library only).
 - Ensure a single top-level command runs the full test suite.
+- Run all unit tests after each change and fix any failures before proceeding.
 
 ## Build and CI
 - Prefer simple Makefiles and incremental build rules.

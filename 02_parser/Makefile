@@ -11,6 +11,7 @@ LEXER_DIR := ../01_lexer
 LEXER_LIB := $(LEXER_DIR)/build/liblexer.a
 
 TEST_SRC := tests/test_parser.c
+TEST_UTIL_SRC := ../tests/test_util.c
 TEST_BIN := $(BUILD_DIR)/test_parser
 
 EXAMPLE_SRC := examples/main_parser.c
@@ -29,8 +30,9 @@ example: $(EXAMPLE_BIN)
 $(LEXER_LIB):
 	$(MAKE) -C $(LEXER_DIR) all
 
-$(TEST_BIN): $(TEST_SRC) $(LIB) $(LEXER_LIB)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(TEST_SRC) $(LIB) $(LEXER_LIB)
+$(TEST_BIN): $(TEST_SRC) $(TEST_UTIL_SRC) $(LIB) $(LEXER_LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(TEST_SRC) $(TEST_UTIL_SRC) \
+		$(LIB) $(LEXER_LIB)
 
 $(EXAMPLE_BIN): $(EXAMPLE_SRC) $(LIB) $(LEXER_LIB)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(EXAMPLE_SRC) $(LIB) $(LEXER_LIB)

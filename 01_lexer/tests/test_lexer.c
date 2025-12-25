@@ -6,10 +6,13 @@
 #include <string.h>
 
 static const char *current_test = "unknown";
+static int total_passed = 0;
+static int total_tests = 0;
 
 static void begin_test(const char *name)
 {
     current_test = name;
+    total_tests++;
 }
 
 static void failf(const char *fmt, ...)
@@ -21,339 +24,375 @@ static void failf(const char *fmt, ...)
     vfprintf(stderr, fmt, args);
     va_end(args);
     fprintf(stderr, "\n");
-    exit(1);
 }
 
-static void assert_true(int condition, const char *message)
-{
-    if (!condition) {
-        failf("%s", message);
-    }
-}
+#define TEST(name, description) static int test_##name(void)
 
-static void assert_token_text(Token token, const char *text)
-{
-    size_t length = strlen(text);
+#define TEST_LIST(X) \
+    X(ident_and_number, "identifiers and numbers") \
+    X(punctuators, "punctuators") \
+    X(identifiers_with_underscores, "identifiers with underscores") \
+    X(number_boundaries, "number boundaries") \
+    X(negative_numbers, "negative numbers") \
+    X(invalid_character, "invalid character") \
+    X(sample_program, "sample program") \
+    X(whitespace_only, "whitespace")
 
-    assert_true(token.length == length, "unexpected token length");
-    assert_true(strncmp(token.start, text, length) == 0,
-        "unexpected token text");
-}
+#define ASSERT_TRUE(expr, message) \
+    do { \
+        if (!(expr)) { \
+            failf("%s", message); \
+            return 0; \
+        } \
+    } while (0)
 
-static void assert_punct_token(Token token, const char *text)
-{
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_token_text(token, text);
-}
-static void test_ident_and_number(void)
+#define ASSERT_TRUEF(expr, fmt, ...) \
+    do { \
+        if (!(expr)) { \
+            failf(fmt, __VA_ARGS__); \
+            return 0; \
+        } \
+    } while (0)
+
+#define ASSERT_TOKEN_TEXT(token_value, text_value) \
+    do { \
+        size_t length = strlen(text_value); \
+        ASSERT_TRUE((token_value).length == length, "unexpected token length"); \
+        ASSERT_TRUE(strncmp((token_value).start, (text_value), length) == 0, \
+            "unexpected token text"); \
+    } while (0)
+
+#define ASSERT_PUNCT_TOKEN(token_value, text_value) \
+    do { \
+        ASSERT_TRUE((token_value).type == TOKEN_PUNCT, "expected TOKEN_PUNCT"); \
+        ASSERT_TOKEN_TEXT((token_value), (text_value)); \
+    } while (0)
+TEST(ident_and_number, "identifiers and numbers")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("identifiers and numbers");
     lexer_init(&lexer, "foo bar1 42");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_true(token.length == 3, "expected length 3");
-    assert_true(strncmp(token.start, "foo", 3) == 0, "expected text 'foo'");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TRUE(token.length == 3, "expected length 3");
+    ASSERT_TRUE(strncmp(token.start, "foo", 3) == 0, "expected text 'foo'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_true(token.length == 4, "expected length 4");
-    assert_true(strncmp(token.start, "bar1", 4) == 0, "expected text 'bar1'");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TRUE(token.length == 4, "expected length 4");
+    ASSERT_TRUE(strncmp(token.start, "bar1", 4) == 0, "expected text 'bar1'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "42", 2) == 0, "expected text '42'");
-    if (token.value != 42) {
-        failf("expected number value 42 but got %ld", token.value);
-    }
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "42", 2) == 0, "expected text '42'");
+    ASSERT_TRUEF(token.value == 42,
+        "expected number value 42 but got %ld",
+        token.value);
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_punctuators(void)
+TEST(punctuators, "punctuators")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("punctuators");
     lexer_init(&lexer, "()+-*/%;,{ }==!= =");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "(", 1) == 0, "expected text '('");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "(", 1) == 0, "expected text '('");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, ")", 1) == 0, "expected text ')'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, ")", 1) == 0, "expected text ')'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "+", 1) == 0, "expected text '+'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "+", 1) == 0, "expected text '+'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "-", 1) == 0, "expected text '-'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "-", 1) == 0, "expected text '-'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "*", 1) == 0, "expected text '*'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "*", 1) == 0, "expected text '*'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "/", 1) == 0, "expected text '/'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "/", 1) == 0, "expected text '/'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "%", 1) == 0, "expected text '%'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "%", 1) == 0, "expected text '%'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, ";", 1) == 0, "expected text ';'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, ";", 1) == 0, "expected text ';'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, ",", 1) == 0, "expected text ','");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, ",", 1) == 0, "expected text ','");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "{", 1) == 0, "expected text '{'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "{", 1) == 0, "expected text '{'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "}", 1) == 0, "expected text '}'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "}", 1) == 0, "expected text '}'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "==", 2) == 0, "expected text '=='");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "==", 2) == 0, "expected text '=='");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "!=", 2) == 0, "expected text '!='");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "!=", 2) == 0, "expected text '!='");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "=", 1) == 0, "expected text '='");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "=", 1) == 0, "expected text '='");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_identifiers_with_underscores(void)
+TEST(identifiers_with_underscores, "identifiers with underscores")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("identifiers with underscores");
     lexer_init(&lexer, "_x __y1");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "_x", 2) == 0, "expected text '_x'");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "_x", 2) == 0, "expected text '_x'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_true(token.length == 4, "expected length 4");
-    assert_true(strncmp(token.start, "__y1", 4) == 0, "expected text '__y1'");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TRUE(token.length == 4, "expected length 4");
+    ASSERT_TRUE(strncmp(token.start, "__y1", 4) == 0, "expected text '__y1'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_number_boundaries(void)
+TEST(number_boundaries, "number boundaries")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("number boundaries");
     lexer_init(&lexer, "0 00123");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "0", 1) == 0, "expected text '0'");
-    assert_true(token.value == 0, "expected value 0");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "0", 1) == 0, "expected text '0'");
+    ASSERT_TRUE(token.value == 0, "expected value 0");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 5, "expected length 5");
-    assert_true(strncmp(token.start, "00123", 5) == 0, "expected text '00123'");
-    assert_true(token.value == 123, "expected value 123");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 5, "expected length 5");
+    ASSERT_TRUE(strncmp(token.start, "00123", 5) == 0, "expected text '00123'");
+    ASSERT_TRUE(token.value == 123, "expected value 123");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_negative_numbers(void)
+TEST(negative_numbers, "negative numbers")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("negative numbers");
     lexer_init(&lexer, "-7 -0 - 8");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "-7", 2) == 0, "expected text '-7'");
-    assert_true(token.value == -7, "expected value -7");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "-7", 2) == 0, "expected text '-7'");
+    ASSERT_TRUE(token.value == -7, "expected value -7");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 2, "expected length 2");
-    assert_true(strncmp(token.start, "-0", 2) == 0, "expected text '-0'");
-    assert_true(token.value == 0, "expected value 0");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "-0", 2) == 0, "expected text '-0'");
+    ASSERT_TRUE(token.value == 0, "expected value 0");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "-", 1) == 0, "expected text '-'");
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "-", 1) == 0, "expected text '-'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "8", 1) == 0, "expected text '8'");
-    assert_true(token.value == 8, "expected value 8");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "8", 1) == 0, "expected text '8'");
+    ASSERT_TRUE(token.value == 8, "expected value 8");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_invalid_character(void)
+TEST(invalid_character, "invalid character")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("invalid character");
     lexer_init(&lexer, "@");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_INVALID, "expected TOKEN_INVALID");
-    assert_true(token.length == 1, "expected length 1");
-    assert_true(strncmp(token.start, "@", 1) == 0, "expected text '@'");
+    ASSERT_TRUE(token.type == TOKEN_INVALID, "expected TOKEN_INVALID");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "@", 1) == 0, "expected text '@'");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_sample_program(void)
+TEST(sample_program, "sample program")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("sample program");
     lexer_init(&lexer, "int main(){int x=-7%3;return x;}");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "int");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "int");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "main");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "main");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, "(");
+    ASSERT_PUNCT_TOKEN(token, "(");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, ")");
+    ASSERT_PUNCT_TOKEN(token, ")");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, "{");
+    ASSERT_PUNCT_TOKEN(token, "{");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "int");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "int");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "x");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "x");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, "=");
+    ASSERT_PUNCT_TOKEN(token, "=");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_token_text(token, "-7");
-    assert_true(token.value == -7, "expected value -7");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TOKEN_TEXT(token, "-7");
+    ASSERT_TRUE(token.value == -7, "expected value -7");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, "%");
+    ASSERT_PUNCT_TOKEN(token, "%");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
-    assert_token_text(token, "3");
-    assert_true(token.value == 3, "expected value 3");
+    ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
+    ASSERT_TOKEN_TEXT(token, "3");
+    ASSERT_TRUE(token.value == 3, "expected value 3");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, ";");
+    ASSERT_PUNCT_TOKEN(token, ";");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "return");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "return");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    assert_token_text(token, "x");
+    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
+    ASSERT_TOKEN_TEXT(token, "x");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, ";");
+    ASSERT_PUNCT_TOKEN(token, ";");
 
     token = lexer_next(&lexer);
-    assert_punct_token(token, "}");
+    ASSERT_PUNCT_TOKEN(token, "}");
 
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
 
-static void test_whitespace_only(void)
+TEST(whitespace_only, "whitespace")
 {
     Lexer lexer;
     Token token;
-
-    begin_test("whitespace");
     lexer_init(&lexer, " \n\t  ");
     token = lexer_next(&lexer);
-    assert_true(token.type == TOKEN_EOF, "expected TOKEN_EOF");
-    assert_true(token.length == 0, "expected empty EOF token");
+    ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");
+    ASSERT_TRUE(token.length == 0, "expected empty EOF token");
+
+    return 1;
 }
+
+typedef struct {
+    const char *name;
+    int (*fn)(void);
+} TestCase;
+
+#define TEST_ENTRY(name, description) { description, test_##name },
+
+static const TestCase tests[] = {
+    TEST_LIST(TEST_ENTRY)
+};
 
 int main(void)
 {
-    test_ident_and_number();
-    test_punctuators();
-    test_identifiers_with_underscores();
-    test_number_boundaries();
-    test_negative_numbers();
-    test_invalid_character();
-    test_sample_program();
-    test_whitespace_only();
-    printf("ok\n");
-    return 0;
+    size_t i;
+
+    for (i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        begin_test(tests[i].name);
+        if (tests[i].fn()) {
+            total_passed++;
+            printf("PASS: %s\n", current_test);
+        } else {
+            printf("FAIL: %s\n", current_test);
+        }
+    }
+    printf("\nSummary: %d passed, %d failed, %d total\n",
+        total_passed,
+        total_tests - total_passed,
+        total_tests);
+    return total_tests == total_passed ? 0 : 1;
 }

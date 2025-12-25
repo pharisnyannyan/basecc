@@ -8,6 +8,11 @@ typedef enum TokenType {
     TOKEN_IDENT,
     TOKEN_NUMBER,
     TOKEN_PUNCT,
+    TOKEN_IF,
+    TOKEN_ELSE,
+    TOKEN_WHILE,
+    TOKEN_SWITCH,
+    TOKEN_CASE,
     TOKEN_INVALID = 1000 /* keep stable value for compatibility */
 } TokenType;
 

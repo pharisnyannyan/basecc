@@ -254,7 +254,7 @@ TEST(keywords, "keywords")
 {
     Lexer lexer;
     Token token;
-    lexer_init(&lexer, "if else while switch case iffy");
+    lexer_init(&lexer, "if else while switch case return iffy");
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_IF, "if");
@@ -270,6 +270,9 @@ TEST(keywords, "keywords")
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_CASE, "case");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -341,8 +344,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "{");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
@@ -361,8 +363,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "{");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
@@ -445,8 +446,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "}");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -509,8 +509,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_TOKEN_TEXT(token, ":");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
@@ -531,8 +530,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_TOKEN_TEXT(token, ":");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
@@ -621,8 +619,7 @@ TEST(sample_program, "sample program")
     ASSERT_PUNCT_TOKEN(token, ";");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "return");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");

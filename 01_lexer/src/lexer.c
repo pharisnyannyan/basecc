@@ -107,6 +107,10 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_CASE, text, length);
     }
 
+    if (length == 6 && strncmp(text, "return", 6) == 0) {
+        return make_token(TOKEN_RETURN, text, length);
+    }
+
     if (length == 3 && strncmp(text, "int", 3) == 0) {
         return make_token(TOKEN_INT, text, length);
     }

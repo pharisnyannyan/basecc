@@ -30,6 +30,7 @@ static void failf(const char *fmt, ...)
 
 #define TEST_LIST(X) \
     X(check_translation_unit, "check translation unit") \
+    X(check_function_control_flow, "check function control flow") \
     X(check_invalid_token, "check invalid token") \
     X(check_missing_semicolon, "check missing semicolon") \
     X(check_expected_number, "check expected number")
@@ -48,6 +49,18 @@ TEST(check_translation_unit, "check translation unit")
     Checker checker;
 
     checker_init(&checker, "int main; int value = 7;");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_function_control_flow, "check function control flow")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){while(0);if(1){return 2;}else{return 3;}}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

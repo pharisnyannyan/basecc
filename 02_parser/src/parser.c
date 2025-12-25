@@ -102,9 +102,75 @@ static ParserNode *parser_parse_number(Parser *parser)
     return parser_alloc_node(parser, PARSER_NODE_NUMBER, token);
 }
 
+static ParserNode *parser_parse_expression(Parser *parser);
+
+static ParserNode *parser_parse_call(Parser *parser, Token name_token)
+{
+    ParserNode *node = NULL;
+    ParserNode **tail = NULL;
+
+    if (!parser_match_punct(parser, "(")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected '('");
+    }
+
+    node = parser_alloc_node(parser, PARSER_NODE_CALL, name_token);
+    if (!node) {
+        return NULL;
+    }
+
+    tail = &node->first_child;
+
+    if (!token_is_punct(parser->last_token, ")")) {
+        ParserNode *arg = parser_parse_expression(parser);
+        if (!arg || arg->type == PARSER_NODE_INVALID) {
+            parser_free_node(node);
+            return arg;
+        }
+
+        *tail = arg;
+        tail = &arg->next;
+
+        while (parser_match_punct(parser, ",")) {
+            arg = parser_parse_expression(parser);
+            if (!arg || arg->type == PARSER_NODE_INVALID) {
+                parser_free_node(node);
+                return arg;
+            }
+
+            *tail = arg;
+            tail = &arg->next;
+        }
+    }
+
+    if (!parser_match_punct(parser, ")")) {
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
+            "parser: expected ')'");
+        parser_free_node(node);
+        return error_node;
+    }
+
+    return node;
+}
+
 static ParserNode *parser_parse_expression(Parser *parser)
 {
-    return parser_parse_number(parser);
+    Token token = parser->last_token;
+
+    if (token.type == TOKEN_NUMBER) {
+        return parser_parse_number(parser);
+    }
+
+    if (token.type == TOKEN_IDENT) {
+        parser_next(parser);
+        return parser_parse_call(parser, token);
+    }
+
+    if (token.type == TOKEN_INVALID) {
+        return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    return parser_make_error(parser, token, "parser: expected expression");
 }
 
 static ParserNode *parser_parse_statement(Parser *parser);
@@ -319,7 +385,7 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token)
     }
 
     if (parser_match_punct(parser, "=")) {
-        ParserNode *init = parser_parse_number(parser);
+        ParserNode *init = parser_parse_expression(parser);
 
         if (!init || init->type == PARSER_NODE_INVALID) {
             parser_free_node(node);

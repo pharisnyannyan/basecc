@@ -31,6 +31,7 @@ static void failf(const char *fmt, ...)
 #define TEST_LIST(X) \
     X(parse_translation_unit, "parse translation unit") \
     X(parse_function_control_flow, "parse function control flow") \
+    X(parse_function_call, "parse function call") \
     X(parse_invalid_token, "parse invalid token") \
     X(parse_missing_semicolon, "parse missing semicolon") \
     X(parse_expected_number, "parse expected number")
@@ -110,6 +111,45 @@ TEST(parse_function_control_flow, "parse function control flow")
     ASSERT_TRUE(node->first_child->first_child->first_child->next->type
         == PARSER_NODE_IF,
         "expected if statement");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_function_call, "parse function call")
+{
+    Parser parser;
+
+    parser_init(&parser, "int foo(){return 1;} int main(){return foo();}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit");
+    ASSERT_TRUE(node->first_child != NULL, "expected first function");
+    ASSERT_TRUE(node->first_child->next != NULL, "expected second function");
+    ASSERT_TRUE(node->first_child->next->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    ASSERT_TRUE(token_equals(node->first_child->next->token, "main"),
+        "expected function name 'main'");
+    ASSERT_TRUE(node->first_child->next->first_child != NULL,
+        "expected function body");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child != NULL,
+        "expected return statement");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->type
+        == PARSER_NODE_RETURN,
+        "expected return statement");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        != NULL,
+        "expected return expression");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        ->type == PARSER_NODE_CALL,
+        "expected call expression");
+    ASSERT_TRUE(token_equals(
+        node->first_child->next->first_child->first_child->first_child->token,
+        "foo"),
+        "expected call to 'foo'");
 
     parser_free_node(node);
     return 1;

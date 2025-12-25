@@ -319,8 +319,7 @@ TEST(keyword_snippets, "keyword snippets")
         "int sw(int v){switch(v){case 0:return 0;case 1:return 1;}}");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -330,8 +329,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "(");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -404,8 +402,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "}");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -415,8 +412,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "(");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -487,8 +483,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "}");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -498,8 +493,7 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, "(");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -609,8 +603,7 @@ TEST(sample_program, "sample program")
     lexer_init(&lexer, "int main(){int x=-7%3;return x;}");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
@@ -626,8 +619,7 @@ TEST(sample_program, "sample program")
     ASSERT_PUNCT_TOKEN(token, "{");
 
     token = lexer_next(&lexer);
-    ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");
-    ASSERT_TOKEN_TEXT(token, "int");
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_INT, "int");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_IDENT, "expected TOKEN_IDENT");

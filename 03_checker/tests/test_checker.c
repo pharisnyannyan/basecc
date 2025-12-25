@@ -10,6 +10,7 @@
     X(check_pointer_support, "check pointer support") \
     X(check_function_control_flow, "check function control flow") \
     X(check_function_call, "check function call") \
+    X(check_function_parameters, "check function parameters") \
     X(check_binary_expression, "check binary expression") \
     X(check_parenthesized_arithmetic, "check parenthesized arithmetic") \
     X(check_nested_parentheses, "check nested parentheses") \
@@ -74,6 +75,19 @@ TEST(check_function_call, "check function call")
     Checker checker;
 
     checker_init(&checker, "int foo(){return 1;} int main(){return foo();}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_function_parameters, "check function parameters")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int fib(int n){if(n && (n - 1)){return fib(n - 1) + fib(n - 2);}return n;} int main(){return fib(6);}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

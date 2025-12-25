@@ -631,38 +631,121 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
     return node;
 }
 
+static ParserNode *parser_parse_parameter(Parser *parser)
+{
+    Token token = parser->last_token;
+    int pointer_depth = 0;
+
+    if (token.type == TOKEN_INVALID) {
+        return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    if (!token_is_type(token)) {
+        return parser_make_error(parser, token, "parser: expected type");
+    }
+
+    Token type_token = token;
+
+    parser_next(parser);
+    token = parser->last_token;
+
+    while (token_is_punct(token, "*")) {
+        pointer_depth++;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
+    if (token.type == TOKEN_INVALID) {
+        return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    if (token.type != TOKEN_IDENT) {
+        return parser_make_error(parser, token, "parser: expected identifier");
+    }
+
+    parser_next(parser);
+
+    ParserNode *node = parser_alloc_node(parser, PARSER_NODE_PARAMETER, token);
+    if (!node) {
+        return NULL;
+    }
+
+    node->type_token = type_token;
+    node->pointer_depth = pointer_depth;
+    return node;
+}
+
 static ParserNode *parser_parse_function(Parser *parser, Token name_token,
     Token type_token)
 {
+    ParserNode *params = NULL;
+    ParserNode **tail = NULL;
+
     if (!parser_match_punct(parser, "(")) {
         return parser_make_error(parser, parser->last_token,
             "parser: expected '('");
     }
 
+    tail = &params;
+
+    if (!token_is_punct(parser->last_token, ")")) {
+        ParserNode *param = NULL;
+
+        param = parser_parse_parameter(parser);
+        if (!param || param->type == PARSER_NODE_INVALID) {
+            parser_free_node(params);
+            return param;
+        }
+
+        *tail = param;
+        tail = &param->next;
+
+        while (parser_match_punct(parser, ",")) {
+            param = parser_parse_parameter(parser);
+            if (!param || param->type == PARSER_NODE_INVALID) {
+                parser_free_node(params);
+                return param;
+            }
+
+            *tail = param;
+            tail = &param->next;
+        }
+    }
+
     if (!parser_match_punct(parser, ")")) {
-        return parser_make_error(parser, parser->last_token,
+        ParserNode *error_node = parser_make_error(parser,
+            parser->last_token,
             "parser: expected ')'");
+        parser_free_node(params);
+        return error_node;
     }
 
     if (!token_is_punct(parser->last_token, "{")) {
-        return parser_make_error(parser, parser->last_token,
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
             "parser: expected '{'");
+        parser_free_node(params);
+        return error_node;
     }
 
     ParserNode *body = parser_parse_block(parser);
     if (!body || body->type == PARSER_NODE_INVALID) {
+        parser_free_node(params);
         return body;
     }
 
     ParserNode *node = parser_alloc_node(parser, PARSER_NODE_FUNCTION,
         name_token);
     if (!node) {
+        parser_free_node(params);
         parser_free_node(body);
         return NULL;
     }
 
     node->type_token = type_token;
-    node->first_child = body;
+    node->first_child = params ? params : body;
+    if (params) {
+        *tail = body;
+    }
     return node;
 }
 

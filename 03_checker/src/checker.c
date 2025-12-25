@@ -50,6 +50,13 @@ static int token_is_punct(Token token, const char *text)
     return strncmp(token.start, text, length) == 0;
 }
 
+static int token_is_type(Token token)
+{
+    return token.type == TOKEN_INT
+        || token.type == TOKEN_SHORT
+        || token.type == TOKEN_CHAR;
+}
+
 static int checker_validate_binary_operator(Checker *checker, Token token)
 {
     if (token_is_punct(token, "+")
@@ -91,11 +98,6 @@ static int checker_validate_expression(Checker *checker,
         if (node->token.type != TOKEN_IDENT) {
             return checker_set_error(checker,
                 "checker: expected function identifier");
-        }
-
-        if (node->first_child) {
-            return checker_set_error(checker,
-                "checker: arguments not supported");
         }
 
         for (child = node->first_child; child; child = child->next) {
@@ -266,6 +268,9 @@ static int checker_validate_declaration(Checker *checker,
 
 static int checker_validate_function(Checker *checker, const ParserNode *node)
 {
+    const ParserNode *child = NULL;
+    const ParserNode *body = NULL;
+
     if (node->type != PARSER_NODE_FUNCTION) {
         return checker_set_error(checker, "checker: expected function");
     }
@@ -274,16 +279,48 @@ static int checker_validate_function(Checker *checker, const ParserNode *node)
         return checker_set_error(checker, "checker: expected identifier");
     }
 
-    if (!node->first_child || node->first_child->next) {
+    if (!node->first_child) {
         return checker_set_error(checker, "checker: expected function body");
     }
 
-    if (node->first_child->type != PARSER_NODE_BLOCK) {
+    for (child = node->first_child; child; child = child->next) {
+        if (child->type == PARSER_NODE_BLOCK) {
+            body = child;
+            break;
+        }
+
+        if (child->type != PARSER_NODE_PARAMETER) {
+            return checker_set_error(checker,
+                "checker: expected function parameter");
+        }
+
+        if (child->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected parameter identifier");
+        }
+
+        if (!token_is_type(child->type_token)) {
+            return checker_set_error(checker,
+                "checker: expected parameter type");
+        }
+
+        if (child->first_child) {
+            return checker_set_error(checker,
+                "checker: unexpected parameter children");
+        }
+    }
+
+    if (!body) {
         return checker_set_error(checker,
             "checker: expected function block");
     }
 
-    return checker_validate_statement(checker, node->first_child);
+    if (body->next) {
+        return checker_set_error(checker,
+            "checker: unexpected function body");
+    }
+
+    return checker_validate_statement(checker, body);
 }
 
 static int checker_validate_translation_unit(Checker *checker,

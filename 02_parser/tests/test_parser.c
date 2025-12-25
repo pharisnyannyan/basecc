@@ -11,6 +11,7 @@
     X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
+    X(parse_function_parameters, "parse function parameters") \
     X(parse_binary_expression, "parse binary expression") \
     X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
     X(parse_nested_parentheses, "parse nested parentheses") \
@@ -209,6 +210,63 @@ TEST(parse_function_call, "parse function call")
         node->first_child->next->first_child->first_child->first_child->token,
         "foo"),
         "expected call to 'foo'");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_function_parameters, "parse function parameters")
+{
+    Parser parser;
+    ParserNode *function = NULL;
+    ParserNode *param = NULL;
+    ParserNode *body = NULL;
+    ParserNode *call = NULL;
+
+    parser_init(&parser,
+        "int fib(int n){return n;} int main(){return fib(2);}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit");
+    ASSERT_TRUE(node->first_child != NULL, "expected function");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+
+    function = node->first_child;
+    ASSERT_TRUE(token_equals(function->token, "fib"),
+        "expected function name 'fib'");
+    ASSERT_TRUE(function->first_child != NULL, "expected function child");
+
+    param = function->first_child;
+    ASSERT_TRUE(param->type == PARSER_NODE_PARAMETER,
+        "expected parameter node");
+    ASSERT_TRUE(token_equals(param->token, "n"),
+        "expected parameter name 'n'");
+    ASSERT_TRUE(param->type_token.type == TOKEN_INT,
+        "expected int parameter type");
+    ASSERT_TRUE(param->next != NULL, "expected function body");
+    ASSERT_TRUE(param->next->type == PARSER_NODE_BLOCK,
+        "expected function block");
+
+    body = node->first_child->next;
+    ASSERT_TRUE(body != NULL, "expected main function");
+    ASSERT_TRUE(body->type == PARSER_NODE_FUNCTION,
+        "expected main function node");
+    ASSERT_TRUE(body->first_child != NULL, "expected main body");
+    ASSERT_TRUE(body->first_child->type == PARSER_NODE_BLOCK,
+        "expected main block");
+
+    call = body->first_child->first_child->first_child;
+    ASSERT_TRUE(call != NULL, "expected call expression");
+    ASSERT_TRUE(call->type == PARSER_NODE_CALL,
+        "expected call expression");
+    ASSERT_TRUE(call->first_child != NULL,
+        "expected call argument");
+    ASSERT_TRUE(call->first_child->type == PARSER_NODE_NUMBER,
+        "expected numeric argument");
 
     parser_free_node(node);
     return 1;

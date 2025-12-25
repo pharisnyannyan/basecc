@@ -1,4 +1,5 @@
-CC ?= clang
+CC ?= cc
+LL_CC ?= $(CC)
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2
 CPPFLAGS ?= -I../include -I../../03_checker/include -I../../02_parser/include \
 	-I../../01_lexer/include
@@ -24,7 +25,9 @@ OUTPUT := $(BUILD_DIR)/arithmetic_output.txt
 
 all: $(BIN)
 
-generate: $(CODEGEN_BIN)
+generate: $(LL)
+
+$(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
 
 compile: generate $(OBJ)
@@ -44,7 +47,7 @@ $(CODEGEN_BIN): $(CODEGEN_SRC) $(CODEGEN_LIB) $(CHECKER_LIB) \
 		$(CHECKER_LIB) $(PARSER_LIB) $(LEXER_LIB)
 
 $(OBJ): $(LL) | $(BUILD_DIR)
-	$(CC) -c $(LL) -o $(OBJ)
+	$(LL_CC) -c $(LL) -o $(OBJ)
 
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)

@@ -21,6 +21,9 @@ These guidelines apply to the entire repository.
 - Prefer minimal C tests, shell scripts, or small Python scripts (standard library only).
 - Ensure a single top-level command runs the full test suite.
 - Run all unit tests after each change and fix any failures before proceeding.
+- Integration tests depend on LLVM IR toolchains that are not available in this
+  agent environment. Only run unit tests locally; integration tests run in
+  GitHub Actions and should be fixed there if they fail.
 
 ## Build and CI
 - Prefer simple Makefiles and incremental build rules.

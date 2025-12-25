@@ -56,11 +56,22 @@ static int checker_validate_binary_operator(Checker *checker, Token token)
         || token_is_punct(token, "-")
         || token_is_punct(token, "*")
         || token_is_punct(token, "/")
-        || token_is_punct(token, "%")) {
+        || token_is_punct(token, "%")
+        || token_is_punct(token, "&&")
+        || token_is_punct(token, "||")) {
         return 1;
     }
 
     return checker_set_error(checker, "checker: expected binary operator");
+}
+
+static int checker_validate_unary_operator(Checker *checker, Token token)
+{
+    if (token_is_punct(token, "!")) {
+        return 1;
+    }
+
+    return checker_set_error(checker, "checker: expected unary operator");
 }
 
 static int checker_validate_expression(Checker *checker,
@@ -90,6 +101,21 @@ static int checker_validate_expression(Checker *checker,
         }
 
         return 1;
+    }
+
+    if (node->type == PARSER_NODE_UNARY) {
+        const ParserNode *operand = node->first_child;
+
+        if (!operand || operand->next) {
+            return checker_set_error(checker,
+                "checker: expected unary operand");
+        }
+
+        if (!checker_validate_unary_operator(checker, node->token)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, operand);
     }
 
     if (node->type == PARSER_NODE_BINARY) {

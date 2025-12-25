@@ -64,7 +64,7 @@ TEST(punctuators, "punctuators")
 {
     Lexer lexer;
     Token token;
-    lexer_init(&lexer, "()+-*/%;,{ }==!= =");
+    lexer_init(&lexer, "()+-*/%;,{ }==!=&&|| =!");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
@@ -133,8 +133,23 @@ TEST(punctuators, "punctuators")
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "&&", 2) == 0, "expected text '&&'");
+
+    token = lexer_next(&lexer);
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 2, "expected length 2");
+    ASSERT_TRUE(strncmp(token.start, "||", 2) == 0, "expected text '||'");
+
+    token = lexer_next(&lexer);
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
     ASSERT_TRUE(token.length == 1, "expected length 1");
     ASSERT_TRUE(strncmp(token.start, "=", 1) == 0, "expected text '='");
+
+    token = lexer_next(&lexer);
+    ASSERT_TRUE(token.type == TOKEN_PUNCT, "expected TOKEN_PUNCT");
+    ASSERT_TRUE(token.length == 1, "expected length 1");
+    ASSERT_TRUE(strncmp(token.start, "!", 1) == 0, "expected text '!'");
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");

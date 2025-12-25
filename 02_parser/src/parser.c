@@ -103,6 +103,7 @@ static ParserNode *parser_parse_number(Parser *parser)
 }
 
 static ParserNode *parser_parse_expression(Parser *parser);
+static ParserNode *parser_parse_unary(Parser *parser);
 
 static ParserNode *parser_parse_call(Parser *parser, Token name_token)
 {
@@ -193,9 +194,36 @@ static ParserNode *parser_parse_primary(Parser *parser)
     return parser_make_error(parser, token, "parser: expected expression");
 }
 
+static ParserNode *parser_parse_unary(Parser *parser)
+{
+    Token token = parser->last_token;
+
+    if (token_is_punct(token, "!")) {
+        ParserNode *node = NULL;
+        ParserNode *operand = NULL;
+
+        parser_next(parser);
+        operand = parser_parse_unary(parser);
+        if (!operand || operand->type == PARSER_NODE_INVALID) {
+            return operand;
+        }
+
+        node = parser_alloc_node(parser, PARSER_NODE_UNARY, token);
+        if (!node) {
+            parser_free_node(operand);
+            return NULL;
+        }
+
+        node->first_child = operand;
+        return node;
+    }
+
+    return parser_parse_primary(parser);
+}
+
 static ParserNode *parser_parse_multiplicative(Parser *parser)
 {
-    ParserNode *left = parser_parse_primary(parser);
+    ParserNode *left = parser_parse_unary(parser);
 
     if (!left || left->type == PARSER_NODE_INVALID) {
         return left;
@@ -210,7 +238,7 @@ static ParserNode *parser_parse_multiplicative(Parser *parser)
 
         parser_next(parser);
 
-        right = parser_parse_primary(parser);
+        right = parser_parse_unary(parser);
         if (!right || right->type == PARSER_NODE_INVALID) {
             parser_free_node(left);
             return right;
@@ -268,9 +296,81 @@ static ParserNode *parser_parse_additive(Parser *parser)
     return left;
 }
 
+static ParserNode *parser_parse_logical_and(Parser *parser)
+{
+    ParserNode *left = parser_parse_additive(parser);
+
+    if (!left || left->type == PARSER_NODE_INVALID) {
+        return left;
+    }
+
+    while (token_is_punct(parser->last_token, "&&")) {
+        Token op = parser->last_token;
+        ParserNode *right = NULL;
+        ParserNode *node = NULL;
+
+        parser_next(parser);
+
+        right = parser_parse_additive(parser);
+        if (!right || right->type == PARSER_NODE_INVALID) {
+            parser_free_node(left);
+            return right;
+        }
+
+        node = parser_alloc_node(parser, PARSER_NODE_BINARY, op);
+        if (!node) {
+            parser_free_node(left);
+            parser_free_node(right);
+            return NULL;
+        }
+
+        node->first_child = left;
+        left->next = right;
+        left = node;
+    }
+
+    return left;
+}
+
+static ParserNode *parser_parse_logical_or(Parser *parser)
+{
+    ParserNode *left = parser_parse_logical_and(parser);
+
+    if (!left || left->type == PARSER_NODE_INVALID) {
+        return left;
+    }
+
+    while (token_is_punct(parser->last_token, "||")) {
+        Token op = parser->last_token;
+        ParserNode *right = NULL;
+        ParserNode *node = NULL;
+
+        parser_next(parser);
+
+        right = parser_parse_logical_and(parser);
+        if (!right || right->type == PARSER_NODE_INVALID) {
+            parser_free_node(left);
+            return right;
+        }
+
+        node = parser_alloc_node(parser, PARSER_NODE_BINARY, op);
+        if (!node) {
+            parser_free_node(left);
+            parser_free_node(right);
+            return NULL;
+        }
+
+        node->first_child = left;
+        left->next = right;
+        left = node;
+    }
+
+    return left;
+}
+
 static ParserNode *parser_parse_expression(Parser *parser)
 {
-    return parser_parse_additive(parser);
+    return parser_parse_logical_or(parser);
 }
 
 static ParserNode *parser_parse_statement(Parser *parser);

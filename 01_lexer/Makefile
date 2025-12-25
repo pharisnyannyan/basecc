@@ -1,26 +1,39 @@
 CC ?= cc
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2
-CPPFLAGS ?= -Iinclude
+CPPFLAGS ?= -Iinclude -I../tests
 
 BUILD_DIR := build
 SRC := src/lexer.c
 OBJ := $(BUILD_DIR)/lexer.o
+LIB := $(BUILD_DIR)/liblexer.a
 
 TEST_SRC := tests/test_lexer.c
 TEST_BIN := $(BUILD_DIR)/test_lexer
 
-.PHONY: all test clean
+EXAMPLE_SRC := examples/main_lex.c
+EXAMPLE_BIN := $(BUILD_DIR)/main_lex
 
-all: $(OBJ)
+.PHONY: all test example clean
+
+all: $(LIB)
 
 test: $(TEST_BIN)
 	./$(TEST_BIN)
 
-$(TEST_BIN): $(TEST_SRC) $(OBJ)
-	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(TEST_SRC) $(OBJ)
+example: $(EXAMPLE_BIN)
+	./$(EXAMPLE_BIN)
+
+$(TEST_BIN): $(TEST_SRC) $(LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(TEST_SRC) $(LIB)
+
+$(EXAMPLE_BIN): $(EXAMPLE_SRC) $(LIB)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -o $@ $(EXAMPLE_SRC) $(LIB)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
+
+$(LIB): $(OBJ) | $(BUILD_DIR)
+	ar rcs $@ $(OBJ)
 
 $(OBJ): $(SRC) | $(BUILD_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $(SRC)

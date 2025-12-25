@@ -1,5 +1,7 @@
 #include "lexer.h"
 
+#include "test_util.h"
+
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,30 +42,6 @@ static void failf(const char *fmt, ...)
     X(sample_program, "sample program") \
     X(whitespace_only, "whitespace")
 
-#define ASSERT_TRUE(expr, message) \
-    do { \
-        if (!(expr)) { \
-            failf("%s", message); \
-            return 0; \
-        } \
-    } while (0)
-
-#define ASSERT_TRUEF(expr, fmt, ...) \
-    do { \
-        if (!(expr)) { \
-            failf(fmt, __VA_ARGS__); \
-            return 0; \
-        } \
-    } while (0)
-
-#define ASSERT_TOKEN_TEXT(token_value, text_value) \
-    do { \
-        size_t length = strlen(text_value); \
-        ASSERT_TRUE((token_value).length == length, "unexpected token length"); \
-        ASSERT_TRUE(strncmp((token_value).start, (text_value), length) == 0, \
-            "unexpected token text"); \
-    } while (0)
-
 #define ASSERT_PUNCT_TOKEN(token_value, text_value) \
     do { \
         ASSERT_TRUE((token_value).type == TOKEN_PUNCT, "expected TOKEN_PUNCT"); \
@@ -96,9 +74,7 @@ TEST(ident_and_number, "identifiers and numbers")
     ASSERT_TRUE(token.type == TOKEN_NUMBER, "expected TOKEN_NUMBER");
     ASSERT_TRUE(token.length == 2, "expected length 2");
     ASSERT_TRUE(strncmp(token.start, "42", 2) == 0, "expected text '42'");
-    ASSERT_TRUEF(token.value == 42,
-        "expected number value 42 but got %ld",
-        token.value);
+    ASSERT_TOKEN_VALUE(token, 42);
 
     token = lexer_next(&lexer);
     ASSERT_TRUE(token.type == TOKEN_EOF, "expected TOKEN_EOF");

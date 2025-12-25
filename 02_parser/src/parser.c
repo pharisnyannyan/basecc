@@ -153,7 +153,7 @@ static ParserNode *parser_parse_call(Parser *parser, Token name_token)
     return node;
 }
 
-static ParserNode *parser_parse_expression(Parser *parser)
+static ParserNode *parser_parse_primary(Parser *parser)
 {
     Token token = parser->last_token;
 
@@ -166,11 +166,111 @@ static ParserNode *parser_parse_expression(Parser *parser)
         return parser_parse_call(parser, token);
     }
 
+    if (token_is_punct(token, "(")) {
+        ParserNode *expr = NULL;
+
+        parser_next(parser);
+        expr = parser_parse_expression(parser);
+        if (!expr || expr->type == PARSER_NODE_INVALID) {
+            return expr;
+        }
+
+        if (!parser_match_punct(parser, ")")) {
+            ParserNode *error_node = parser_make_error(parser,
+                parser->last_token,
+                "parser: expected ')'");
+            parser_free_node(expr);
+            return error_node;
+        }
+
+        return expr;
+    }
+
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
     return parser_make_error(parser, token, "parser: expected expression");
+}
+
+static ParserNode *parser_parse_multiplicative(Parser *parser)
+{
+    ParserNode *left = parser_parse_primary(parser);
+
+    if (!left || left->type == PARSER_NODE_INVALID) {
+        return left;
+    }
+
+    while (token_is_punct(parser->last_token, "*")
+        || token_is_punct(parser->last_token, "/")
+        || token_is_punct(parser->last_token, "%")) {
+        Token op = parser->last_token;
+        ParserNode *right = NULL;
+        ParserNode *node = NULL;
+
+        parser_next(parser);
+
+        right = parser_parse_primary(parser);
+        if (!right || right->type == PARSER_NODE_INVALID) {
+            parser_free_node(left);
+            return right;
+        }
+
+        node = parser_alloc_node(parser, PARSER_NODE_BINARY, op);
+        if (!node) {
+            parser_free_node(left);
+            parser_free_node(right);
+            return NULL;
+        }
+
+        node->first_child = left;
+        left->next = right;
+        left = node;
+    }
+
+    return left;
+}
+
+static ParserNode *parser_parse_additive(Parser *parser)
+{
+    ParserNode *left = parser_parse_multiplicative(parser);
+
+    if (!left || left->type == PARSER_NODE_INVALID) {
+        return left;
+    }
+
+    while (token_is_punct(parser->last_token, "+")
+        || token_is_punct(parser->last_token, "-")) {
+        Token op = parser->last_token;
+        ParserNode *right = NULL;
+        ParserNode *node = NULL;
+
+        parser_next(parser);
+
+        right = parser_parse_multiplicative(parser);
+        if (!right || right->type == PARSER_NODE_INVALID) {
+            parser_free_node(left);
+            return right;
+        }
+
+        node = parser_alloc_node(parser, PARSER_NODE_BINARY, op);
+        if (!node) {
+            parser_free_node(left);
+            parser_free_node(right);
+            return NULL;
+        }
+
+        node->first_child = left;
+        left->next = right;
+        left = node;
+    }
+
+    return left;
+}
+
+static ParserNode *parser_parse_expression(Parser *parser)
+{
+    return parser_parse_additive(parser);
 }
 
 static ParserNode *parser_parse_statement(Parser *parser);

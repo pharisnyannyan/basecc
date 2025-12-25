@@ -13,6 +13,7 @@ typedef enum ParserNodeType {
     PARSER_NODE_RETURN,
     PARSER_NODE_EMPTY,
     PARSER_NODE_CALL,
+    PARSER_NODE_BINARY,
     PARSER_NODE_NUMBER,
     PARSER_NODE_INVALID
 } ParserNodeType;

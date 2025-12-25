@@ -10,6 +10,21 @@ typedef struct FunctionContext {
     int next_temp_id;
 } FunctionContext;
 
+static int token_is_punct(Token token, const char *text)
+{
+    size_t length = strlen(text);
+
+    if (token.type != TOKEN_PUNCT) {
+        return 0;
+    }
+
+    if (token.length != length) {
+        return 0;
+    }
+
+    return strncmp(token.start, text, length) == 0;
+}
+
 static int codegen_set_error(Codegen *codegen, const char *message)
 {
     if (!codegen->error_message) {
@@ -100,6 +115,49 @@ static int codegen_emit_expression(FunctionContext *ctx,
             value,
             (int)node->token.length,
             node->token.start);
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_BINARY) {
+        const ParserNode *left = node->first_child;
+        const ParserNode *right = left ? left->next : NULL;
+        char left_value[32];
+        char right_value[32];
+        const char *opcode = NULL;
+
+        if (!left || !right || right->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected binary operands");
+        }
+
+        if (!codegen_emit_expression(ctx, left, left_value,
+            sizeof(left_value))) {
+            return 0;
+        }
+
+        if (!codegen_emit_expression(ctx, right, right_value,
+            sizeof(right_value))) {
+            return 0;
+        }
+
+        if (token_is_punct(node->token, "+")) {
+            opcode = "add";
+        } else if (token_is_punct(node->token, "-")) {
+            opcode = "sub";
+        } else if (token_is_punct(node->token, "*")) {
+            opcode = "mul";
+        } else if (token_is_punct(node->token, "/")) {
+            opcode = "sdiv";
+        } else if (token_is_punct(node->token, "%")) {
+            opcode = "srem";
+        } else {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected binary operator");
+        }
+
+        snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = %s i32 %s, %s\n",
+            value, opcode, left_value, right_value);
         return 1;
     }
 

@@ -22,7 +22,7 @@ TEST_BIN := $(BUILD_DIR)/test_codegen
 EXAMPLE_SRC := examples/main_codegen.c
 EXAMPLE_BIN := $(BUILD_DIR)/main_codegen
 
-.PHONY: all test example clean
+.PHONY: all test example integration-test clean
 
 all: $(LIB)
 
@@ -31,6 +31,9 @@ test: $(TEST_BIN)
 
 example: $(EXAMPLE_BIN)
 	./$(EXAMPLE_BIN)
+
+integration-test: $(LIB) $(CHECKER_LIB) $(PARSER_LIB) $(LEXER_LIB)
+	$(MAKE) -C integration_tests verify
 
 $(CHECKER_LIB):
 	$(MAKE) -C $(CHECKER_DIR) all

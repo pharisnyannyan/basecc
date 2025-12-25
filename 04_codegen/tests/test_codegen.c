@@ -12,6 +12,7 @@
     X(generate_defaults, "generate default initializers") \
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_function_call, "generate function call") \
+    X(generate_arithmetic_function, "generate arithmetic function") \
     X(check_invalid_syntax, "reject invalid syntax")
 
 static char *read_file(const char *path, size_t *size_out)
@@ -201,6 +202,17 @@ TEST(generate_function_call, "generate function call")
         "codegen_function_call",
         "tests/fixtures/function_call.c",
         "tests/fixtures/function_call.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_arithmetic_function, "generate arithmetic function")
+{
+    CodegenFixture fixture = {
+        "codegen_arithmetic",
+        "testdata/arithmetic_runtime.c",
+        "testdata/arithmetic_runtime.ll"
     };
 
     return run_codegen_fixture(&fixture);

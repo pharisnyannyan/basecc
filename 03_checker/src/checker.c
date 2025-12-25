@@ -1,5 +1,7 @@
 #include "checker.h"
 
+#include <string.h>
+
 static int checker_set_error(Checker *checker, const char *message)
 {
     if (!checker->error_message) {
@@ -33,6 +35,34 @@ static int checker_validate_number(Checker *checker, const ParserNode *node)
     return 1;
 }
 
+static int token_is_punct(Token token, const char *text)
+{
+    size_t length = strlen(text);
+
+    if (token.type != TOKEN_PUNCT) {
+        return 0;
+    }
+
+    if (token.length != length) {
+        return 0;
+    }
+
+    return strncmp(token.start, text, length) == 0;
+}
+
+static int checker_validate_binary_operator(Checker *checker, Token token)
+{
+    if (token_is_punct(token, "+")
+        || token_is_punct(token, "-")
+        || token_is_punct(token, "*")
+        || token_is_punct(token, "/")
+        || token_is_punct(token, "%")) {
+        return 1;
+    }
+
+    return checker_set_error(checker, "checker: expected binary operator");
+}
+
 static int checker_validate_expression(Checker *checker,
     const ParserNode *node)
 {
@@ -60,6 +90,26 @@ static int checker_validate_expression(Checker *checker,
         }
 
         return 1;
+    }
+
+    if (node->type == PARSER_NODE_BINARY) {
+        const ParserNode *left = node->first_child;
+        const ParserNode *right = left ? left->next : NULL;
+
+        if (!left || !right || right->next) {
+            return checker_set_error(checker,
+                "checker: expected binary operands");
+        }
+
+        if (!checker_validate_binary_operator(checker, node->token)) {
+            return 0;
+        }
+
+        if (!checker_validate_expression(checker, left)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, right);
     }
 
     return checker_set_error(checker, "checker: expected expression");

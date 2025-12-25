@@ -9,6 +9,7 @@
     X(parse_translation_unit, "parse translation unit") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
+    X(parse_binary_expression, "parse binary expression") \
     X(parse_invalid_token, "parse invalid token") \
     X(parse_missing_semicolon, "parse missing semicolon") \
     X(parse_expected_number, "parse expected number")
@@ -127,6 +128,59 @@ TEST(parse_function_call, "parse function call")
         node->first_child->next->first_child->first_child->first_child->token,
         "foo"),
         "expected call to 'foo'");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_binary_expression, "parse binary expression")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+    ParserNode *left = NULL;
+    ParserNode *right = NULL;
+
+    parser_init(&parser, "int main(){return 1+2*3 - 4%5;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+    expr = node->first_child
+        ->first_child
+        ->first_child
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_BINARY,
+        "expected binary expression");
+    ASSERT_TRUE(token_equals(expr->token, "-"),
+        "expected '-' operator");
+
+    left = expr->first_child;
+    right = left ? left->next : NULL;
+    ASSERT_TRUE(left != NULL, "expected left expression");
+    ASSERT_TRUE(right != NULL, "expected right expression");
+
+    ASSERT_TRUE(left->type == PARSER_NODE_BINARY, "expected '+' node");
+    ASSERT_TRUE(token_equals(left->token, "+"), "expected '+' operator");
+    ASSERT_TRUE(right->type == PARSER_NODE_BINARY, "expected '%' node");
+    ASSERT_TRUE(token_equals(right->token, "%"), "expected '%' operator");
+
+    ASSERT_TRUE(left->first_child != NULL, "expected left operand");
+    ASSERT_TRUE(left->first_child->type == PARSER_NODE_NUMBER,
+        "expected number operand");
+    ASSERT_TRUE(left->first_child->next != NULL, "expected right operand");
+    ASSERT_TRUE(left->first_child->next->type == PARSER_NODE_BINARY,
+        "expected '*' operand");
+    ASSERT_TRUE(token_equals(left->first_child->next->token, "*"),
+        "expected '*' operator");
+
+    ASSERT_TRUE(right->first_child != NULL, "expected '%' left operand");
+    ASSERT_TRUE(right->first_child->type == PARSER_NODE_NUMBER,
+        "expected number operand");
+    ASSERT_TRUE(right->first_child->next != NULL, "expected '%' right operand");
+    ASSERT_TRUE(right->first_child->next->type == PARSER_NODE_NUMBER,
+        "expected number operand");
 
     parser_free_node(node);
     return 1;

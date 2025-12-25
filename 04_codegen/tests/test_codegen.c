@@ -45,9 +45,9 @@ static int error_contains(const char *error, const char *text)
     return strstr(error, text) != NULL;
 }
 
-static char *read_file(const char *path)
+static char *read_file(const char *path, size_t *size_out)
 {
-    FILE *file = fopen(path, "r");
+    FILE *file = fopen(path, "rb");
     char *buffer = NULL;
     long size = 0;
     size_t read_bytes = 0;
@@ -82,41 +82,84 @@ static char *read_file(const char *path)
     buffer[read_bytes] = '\0';
 
     fclose(file);
+
+    if (size_out) {
+        *size_out = read_bytes;
+    }
+
     return buffer;
+}
+
+static void normalize_line_endings(char *buffer, size_t *size)
+{
+    size_t read_index = 0;
+    size_t write_index = 0;
+
+    while (read_index < *size) {
+        if (buffer[read_index] == '\r'
+            && read_index + 1 < *size
+            && buffer[read_index + 1] == '\n') {
+            read_index++;
+        }
+
+        buffer[write_index++] = buffer[read_index++];
+    }
+
+    *size = write_index;
+    buffer[write_index] = '\0';
 }
 
 typedef struct {
     const char *name;
     const char *input_path;
     const char *expected_path;
-} CodegenTestdata;
+} CodegenFixture;
 
-static int run_codegen_testdata(const CodegenTestdata *testdata)
+static char *build_output_path(const char *name)
+{
+    size_t length = (size_t)snprintf(NULL, 0, "build/%s.ll", name);
+    char *path = malloc(length + 1);
+
+    if (!path) {
+        return NULL;
+    }
+
+    snprintf(path, length + 1, "build/%s.ll", name);
+    return path;
+}
+
+static int run_codegen_fixture(const CodegenFixture *fixture)
 {
     Codegen codegen;
-    char output[256];
     char *source = NULL;
     char *expected = NULL;
     char *content = NULL;
+    char *output_path = NULL;
+    size_t expected_size = 0;
+    size_t content_size = 0;
     int passed = 0;
 
-    source = read_file(testdata->input_path);
+    source = read_file(fixture->input_path, NULL);
     if (!source) {
-        failf("expected testdata input");
+        failf("expected fixture input");
         goto cleanup;
     }
 
-    expected = read_file(testdata->expected_path);
+    expected = read_file(fixture->expected_path, &expected_size);
     if (!expected) {
-        failf("expected testdata output");
+        failf("expected fixture output");
         goto cleanup;
     }
 
-    snprintf(output, sizeof(output), "build/%s.ll", testdata->name);
+    output_path = build_output_path(fixture->name);
+    if (!output_path) {
+        failf("expected output path");
+        goto cleanup;
+    }
 
     codegen_init(&codegen, source);
 
-    if (!codegen_emit(&codegen, output)) {
+    if (!codegen_emit(&codegen, output_path)) {
         failf("expected codegen success");
         goto cleanup;
     }
@@ -125,12 +168,17 @@ static int run_codegen_testdata(const CodegenTestdata *testdata)
         goto cleanup;
     }
 
-    content = read_file(output);
+    content = read_file(output_path, &content_size);
     if (!content) {
         failf("expected output file content");
         goto cleanup;
     }
-    if (strcmp(content, expected) != 0) {
+
+    normalize_line_endings(expected, &expected_size);
+    normalize_line_endings(content, &content_size);
+
+    if (expected_size != content_size
+        || memcmp(content, expected, expected_size) != 0) {
         failf("unexpected LLVM IR output");
         goto cleanup;
     }
@@ -141,25 +189,26 @@ cleanup:
     free(source);
     free(expected);
     free(content);
+    free(output_path);
     return passed;
 }
 
 TEST(generate_simple_module, "generate simple module")
 {
-    CodegenTestdata testdata = {
+    CodegenFixture fixture = {
         "codegen_simple",
-    return run_codegen_testdata(&testdata);
-    CodegenTestdata testdata = {
+        "tests/fixtures/simple_module.c",
+        "tests/fixtures/simple_module.ll"
     };
 
-    return run_codegen_testdata(&testdata);
+    return run_codegen_fixture(&fixture);
 }
 
-    CodegenTestdata testdata = {
-    return run_codegen_testdata(&testdata);
-    CodegenTestdata testdata = {
-    return run_codegen_testdata(&testdata);
-        failf("expected testdata input");
+TEST(generate_defaults, "generate default initializers")
+{
+    CodegenFixture fixture = {
+        "codegen_defaults",
+        "tests/fixtures/defaults.c",
         "tests/fixtures/defaults.ll"
     };
 
@@ -193,7 +242,7 @@ TEST(check_invalid_syntax, "reject invalid syntax")
     Codegen codegen;
     char *source = NULL;
 
-    source = read_file("tests/fixtures/invalid_syntax.c");
+    source = read_file("tests/fixtures/invalid_syntax.c", NULL);
     if (!source) {
         failf("expected fixture input");
         return 0;

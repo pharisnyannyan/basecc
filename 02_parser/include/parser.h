@@ -13,6 +13,7 @@ typedef enum ParserNodeType {
     PARSER_NODE_RETURN,
     PARSER_NODE_EMPTY,
     PARSER_NODE_CALL,
+    PARSER_NODE_IDENTIFIER,
     PARSER_NODE_BINARY,
     PARSER_NODE_UNARY,
     PARSER_NODE_NUMBER,
@@ -25,6 +26,7 @@ struct ParserNode {
     ParserNodeType type;
     Token token;
     Token type_token;
+    int pointer_depth;
     ParserNode *first_child;
     ParserNode *next;
 };

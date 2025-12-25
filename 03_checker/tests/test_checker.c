@@ -7,6 +7,7 @@
 #define TEST_LIST(X) \
     X(check_translation_unit, "check translation unit") \
     X(check_type_declarations, "check type declarations") \
+    X(check_pointer_support, "check pointer support") \
     X(check_function_control_flow, "check function control flow") \
     X(check_function_call, "check function call") \
     X(check_binary_expression, "check binary expression") \
@@ -37,6 +38,18 @@ TEST(check_type_declarations, "check type declarations")
     Checker checker;
 
     checker_init(&checker, "short main; char value = 7;");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_pointer_support, "check pointer support")
+{
+    Checker checker;
+
+    checker_init(&checker, "int value; int *ptr = &value; int main(){return *ptr;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

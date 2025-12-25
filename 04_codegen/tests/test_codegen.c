@@ -32,6 +32,7 @@ static void failf(const char *fmt, ...)
 #define TEST_LIST(X) \
     X(generate_simple_module, "generate simple module") \
     X(generate_defaults, "generate default initializers") \
+    X(generate_control_flow_function, "generate control flow function") \
     X(check_invalid_syntax, "reject invalid syntax")
 
 static int error_contains(const char *error, const char *text)
@@ -121,6 +122,48 @@ TEST(generate_defaults, "generate default initializers")
     char *content = NULL;
 
     codegen_init(&codegen, "int main; int value = -3;");
+
+    ASSERT_TRUE(codegen_emit(&codegen, output),
+        "expected codegen success");
+    ASSERT_TRUE(codegen_error(&codegen) == NULL,
+        "unexpected codegen error");
+
+    content = read_file(output);
+    ASSERT_TRUE(content != NULL, "expected output file content");
+    ASSERT_TRUE(strcmp(content, expected) == 0,
+        "unexpected LLVM IR output");
+
+    free(content);
+    return 1;
+}
+
+TEST(generate_control_flow_function, "generate control flow function")
+{
+    Codegen codegen;
+    const char *output = "build/test_codegen_control_flow.ll";
+    const char *expected =
+        "; ModuleID = 'basecc'\n"
+        "source_filename = \"basecc\"\n\n"
+        "define i32 @main() {\n"
+        "entry:\n"
+        "  br label %while.cond0\n"
+        "while.cond0:\n"
+        "  %t0 = icmp ne i32 0, 0\n"
+        "  br i1 %t0, label %while.body1, label %while.end2\n"
+        "while.body1:\n"
+        "  br label %while.cond0\n"
+        "while.end2:\n"
+        "  %t1 = icmp ne i32 1, 0\n"
+        "  br i1 %t1, label %if.then3, label %if.else4\n"
+        "if.then3:\n"
+        "  ret i32 2\n"
+        "if.else4:\n"
+        "  ret i32 3\n"
+        "}\n";
+    char *content = NULL;
+
+    codegen_init(&codegen,
+        "int main(){while(0);if(1){return 2;}else{return 3;}}");
 
     ASSERT_TRUE(codegen_emit(&codegen, output),
         "expected codegen success");

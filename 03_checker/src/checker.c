@@ -33,6 +33,92 @@ static int checker_validate_number(Checker *checker, const ParserNode *node)
     return 1;
 }
 
+static int checker_validate_expression(Checker *checker,
+    const ParserNode *node)
+{
+    return checker_validate_number(checker, node);
+}
+
+static int checker_validate_statement(Checker *checker,
+    const ParserNode *node)
+{
+    const ParserNode *child = NULL;
+
+    switch (node->type) {
+    case PARSER_NODE_BLOCK:
+        for (child = node->first_child; child; child = child->next) {
+            if (!checker_validate_statement(checker, child)) {
+                return 0;
+            }
+        }
+        return 1;
+    case PARSER_NODE_IF: {
+        const ParserNode *condition = node->first_child;
+        const ParserNode *then_branch = condition ? condition->next : NULL;
+        const ParserNode *else_branch = then_branch ? then_branch->next : NULL;
+
+        if (!condition || !then_branch) {
+            return checker_set_error(checker,
+                "checker: incomplete if statement");
+        }
+
+        if (else_branch && else_branch->next) {
+            return checker_set_error(checker,
+                "checker: unexpected else statement");
+        }
+
+        if (!checker_validate_expression(checker, condition)) {
+            return 0;
+        }
+
+        if (!checker_validate_statement(checker, then_branch)) {
+            return 0;
+        }
+
+        if (else_branch && !checker_validate_statement(checker, else_branch)) {
+            return 0;
+        }
+
+        return 1;
+    }
+    case PARSER_NODE_WHILE: {
+        const ParserNode *condition = node->first_child;
+        const ParserNode *body = condition ? condition->next : NULL;
+
+        if (!condition || !body) {
+            return checker_set_error(checker,
+                "checker: incomplete while statement");
+        }
+
+        if (body->next) {
+            return checker_set_error(checker,
+                "checker: unexpected while statement");
+        }
+
+        if (!checker_validate_expression(checker, condition)) {
+            return 0;
+        }
+
+        return checker_validate_statement(checker, body);
+    }
+    case PARSER_NODE_RETURN:
+        if (!node->first_child || node->first_child->next) {
+            return checker_set_error(checker,
+                "checker: unexpected return statement");
+        }
+
+        return checker_validate_expression(checker, node->first_child);
+    case PARSER_NODE_EMPTY:
+        if (node->first_child) {
+            return checker_set_error(checker,
+                "checker: unexpected empty statement");
+        }
+        return 1;
+    default:
+        return checker_set_error(checker, "checker: expected statement");
+    }
+}
+
 static int checker_validate_declaration(Checker *checker,
     const ParserNode *node)
 {
@@ -58,6 +144,28 @@ static int checker_validate_declaration(Checker *checker,
     return 1;
 }
 
+static int checker_validate_function(Checker *checker, const ParserNode *node)
+{
+    if (node->type != PARSER_NODE_FUNCTION) {
+        return checker_set_error(checker, "checker: expected function");
+    }
+
+    if (node->token.type != TOKEN_IDENT) {
+        return checker_set_error(checker, "checker: expected identifier");
+    }
+
+    if (!node->first_child || node->first_child->next) {
+        return checker_set_error(checker, "checker: expected function body");
+    }
+
+    if (node->first_child->type != PARSER_NODE_BLOCK) {
+        return checker_set_error(checker,
+            "checker: expected function block");
+    }
+
+    return checker_validate_statement(checker, node->first_child);
+}
+
 static int checker_validate_translation_unit(Checker *checker,
     const ParserNode *node)
 {
@@ -73,9 +181,22 @@ static int checker_validate_translation_unit(Checker *checker,
     }
 
     for (child = node->first_child; child; child = child->next) {
-        if (!checker_validate_declaration(checker, child)) {
-            return 0;
+        if (child->type == PARSER_NODE_DECLARATION) {
+            if (!checker_validate_declaration(checker, child)) {
+                return 0;
+            }
+            continue;
         }
+
+        if (child->type == PARSER_NODE_FUNCTION) {
+            if (!checker_validate_function(checker, child)) {
+                return 0;
+            }
+            continue;
+        }
+
+        return checker_set_error(checker,
+            "checker: unexpected top-level node");
     }
 
     return 1;

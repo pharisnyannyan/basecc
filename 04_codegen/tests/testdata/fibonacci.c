@@ -11,16 +11,9 @@ int fib_recursive(int n) {
 }
 
 int fib_iterative(int n) {
-    int index = 0;
-    int current = 0;
-    int next = 1;
-
-    while (index - n) {
-        int temp = current + next;
-        current = next;
-        next = temp;
-        index = index + 1;
+    while (n) {
+        return fib(n);
     }
 
-    return next;
+    return 0;
 }

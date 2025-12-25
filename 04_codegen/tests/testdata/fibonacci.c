@@ -11,9 +11,16 @@ int fib_recursive() {
 }
 
 int fib_iterative() {
-    while (1) {
-        return fib(5);
+    int index = 0;
+    int current = 0;
+    int next = 1;
+
+    while (index - 5) {
+        int temp = current + next;
+        current = next;
+        next = temp;
+        index = index + 1;
     }
 
-    return 0;
+    return next;
 }

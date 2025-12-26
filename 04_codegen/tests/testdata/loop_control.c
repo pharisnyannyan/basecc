@@ -1,11 +1,11 @@
 int main() {
-    while (1) {
-        break;
-    }
+  while (1) {
+    break;
+  }
 
-    for (;;) {
-        continue;
-    }
+  for (;;) {
+    continue;
+  }
 
-    return 0;
+  return 0;
 }

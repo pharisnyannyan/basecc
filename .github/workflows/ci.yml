@@ -7,7 +7,29 @@ on:
   pull_request:
 
 jobs:
+  check-format:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Cache LLVM
+        id: cache-llvm
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/llvm
+          key: ${{ runner.os }}-llvm-15
+
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "15"
+          directory: ${{ runner.temp }}/llvm
+          cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+      - name: Check Formatting
+        run: make check-format
+
   build-and-test:
+    needs: check-format
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

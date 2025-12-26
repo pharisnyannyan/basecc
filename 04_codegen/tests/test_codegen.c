@@ -315,8 +315,8 @@ TEST(check_invalid_syntax, "reject invalid syntax") {
   ASSERT_TRUE(!codegen_emit(&codegen, "build/test_codegen_invalid.ll"),
               "expected codegen failure for invalid syntax");
   ASSERT_TRUE(
-      test_error_contains(codegen_error(&codegen), "expected expression"),
-      "expected 'expected expression' error message");
+    test_error_contains(codegen_error(&codegen), "expected expression"),
+    "expected 'expected expression' error message");
 
   free(source);
   return 1;
@@ -344,7 +344,7 @@ TEST(check_const_assignment, "reject const assignment") {
 TEST(check_const_field_assignment, "reject const field assignment") {
   Codegen codegen;
   char *source =
-      read_file("tests/testdata/const_struct_field_assignment.c", NULL);
+    read_file("tests/testdata/const_struct_field_assignment.c", NULL);
   if (!source) {
     failf("expected fixture input "
           "'tests/testdata/const_struct_field_assignment.c'");
@@ -373,4 +373,6 @@ TEST(generate_enum_definitions, "generate enum definitions") {
 
 static const TestCase tests[] = {TEST_LIST(TEST_ENTRY)};
 
-int main(void) { return test_run(tests, sizeof(tests) / sizeof(tests[0])); }
+int main(void) {
+  return test_run(tests, sizeof(tests) / sizeof(tests[0]));
+}

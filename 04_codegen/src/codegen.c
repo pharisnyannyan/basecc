@@ -437,7 +437,7 @@ static int codegen_resolve_desc(Codegen *codegen, const TypedefSymbol *typedefs,
 
   while (current.type_token.type == TOKEN_IDENT) {
     const TypedefSymbol *symbol =
-        codegen_find_typedef(typedefs, typedef_count, current.type_token);
+      codegen_find_typedef(typedefs, typedef_count, current.type_token);
 
     if (!symbol) {
       return codegen_set_error(codegen, "codegen: unknown typedef");
@@ -564,7 +564,7 @@ static int codegen_emit_member_pointer(FunctionContext *ctx,
       }
 
       base_desc = codegen_make_type_desc(
-          global->type_token, global->pointer_depth, global->is_const);
+        global->type_token, global->pointer_depth, global->is_const);
       if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                                 ctx->typedefs, ctx->typedef_count, base_desc,
                                 &resolved_desc)) {
@@ -622,9 +622,9 @@ static int codegen_emit_member_pointer(FunctionContext *ctx,
       TypeDesc field_desc;
       TypeDesc resolved_desc;
 
-      field_desc = codegen_make_type_desc(field_node->type_token,
-                                          field_node->pointer_depth,
-                                          field_node->is_const);
+      field_desc =
+        codegen_make_type_desc(field_node->type_token,
+                               field_node->pointer_depth, field_node->is_const);
       if (base_is_const) {
         field_desc.is_const = 1;
       }
@@ -708,7 +708,7 @@ static int codegen_resolve_member_type(FunctionContext *ctx,
       }
 
       base_desc = codegen_make_type_desc(
-          global->type_token, global->pointer_depth, global->is_const);
+        global->type_token, global->pointer_depth, global->is_const);
       if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                                 ctx->typedefs, ctx->typedef_count, base_desc,
                                 &resolved_desc)) {
@@ -763,9 +763,9 @@ static int codegen_resolve_member_type(FunctionContext *ctx,
       TypeDesc field_desc;
       TypeDesc resolved_desc;
 
-      field_desc = codegen_make_type_desc(field_node->type_token,
-                                          field_node->pointer_depth,
-                                          field_node->is_const);
+      field_desc =
+        codegen_make_type_desc(field_node->type_token,
+                               field_node->pointer_depth, field_node->is_const);
       if (base_is_const) {
         field_desc.is_const = 1;
       }
@@ -1154,10 +1154,10 @@ void codegen_init(Codegen *codegen, const char *input) {
 }
 
 static int codegen_emit_declaration(
-    Codegen *codegen, const ParserNode *node, const GlobalSymbol *globals,
-    size_t global_count, const StructSymbol *structs, size_t struct_count,
-    const TypedefSymbol *typedefs, size_t typedef_count,
-    const EnumSymbol *enums, size_t enum_count, FILE *out) {
+  Codegen *codegen, const ParserNode *node, const GlobalSymbol *globals,
+  size_t global_count, const StructSymbol *structs, size_t struct_count,
+  const TypedefSymbol *typedefs, size_t typedef_count, const EnumSymbol *enums,
+  size_t enum_count, FILE *out) {
   long value = 0;
   char type_name[32];
   char init_value[64];
@@ -1219,7 +1219,7 @@ static int codegen_emit_declaration(
         snprintf(init_value, sizeof(init_value), "%ld", value);
       } else if (init->type == PARSER_NODE_IDENTIFIER) {
         const EnumSymbol *eval =
-            codegen_lookup_enum(enums, enum_count, init->token);
+          codegen_lookup_enum(enums, enum_count, init->token);
         if (eval) {
           snprintf(init_value, sizeof(init_value), "%d", eval->value);
         } else {
@@ -1228,7 +1228,7 @@ static int codegen_emit_declaration(
         }
       } else {
         return codegen_set_error(
-            codegen, "codegen: expected number or enum initializer");
+          codegen, "codegen: expected number or enum initializer");
       }
     } else if (init->type == PARSER_NODE_NUMBER) {
       if (init->token.value != 0) {
@@ -1268,7 +1268,7 @@ static int codegen_emit_declaration(
       }
 
       symbol_desc = codegen_make_type_desc(
-          symbol->type_token, symbol->pointer_depth, symbol->is_const);
+        symbol->type_token, symbol->pointer_depth, symbol->is_const);
       if (!codegen_resolve_desc(codegen, typedefs, typedef_count, symbol_desc,
                                 &resolved_symbol)) {
         return 0;
@@ -1368,7 +1368,7 @@ static int codegen_emit_static_local(StaticLocalContext *ctx,
         snprintf(init_value, sizeof(init_value), "%ld", value);
       } else if (init->type == PARSER_NODE_IDENTIFIER) {
         const EnumSymbol *eval =
-            codegen_lookup_enum(ctx->enums, ctx->enum_count, init->token);
+          codegen_lookup_enum(ctx->enums, ctx->enum_count, init->token);
         if (eval) {
           snprintf(init_value, sizeof(init_value), "%d", eval->value);
         } else {
@@ -1377,7 +1377,7 @@ static int codegen_emit_static_local(StaticLocalContext *ctx,
         }
       } else {
         return codegen_set_error(
-            ctx->codegen, "codegen: expected number or enum initializer");
+          ctx->codegen, "codegen: expected number or enum initializer");
       }
     } else if (init->type == PARSER_NODE_NUMBER) {
       if (init->token.value != 0) {
@@ -1417,7 +1417,7 @@ static int codegen_emit_static_local(StaticLocalContext *ctx,
       }
 
       symbol_desc = codegen_make_type_desc(
-          symbol->type_token, symbol->pointer_depth, symbol->is_const);
+        symbol->type_token, symbol->pointer_depth, symbol->is_const);
       if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs, ctx->typedef_count,
                                 symbol_desc, &resolved_symbol)) {
         return 0;
@@ -1623,7 +1623,7 @@ static int codegen_expression_type(FunctionContext *ctx, const ParserNode *node,
     }
 
     return_type = codegen_make_type_desc(
-        symbol->type_token, symbol->pointer_depth, symbol->is_const);
+      symbol->type_token, symbol->pointer_depth, symbol->is_const);
     if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                               ctx->typedefs, ctx->typedef_count, return_type,
                               &resolved_return)) {
@@ -1648,7 +1648,7 @@ static int codegen_expression_type(FunctionContext *ctx, const ParserNode *node,
       }
 
       param_type = codegen_make_type_desc(
-          param->type_token, param->pointer_depth, param->is_const);
+        param->type_token, param->pointer_depth, param->is_const);
       if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                                 ctx->typedefs, ctx->typedef_count, param_type,
                                 &param_type)) {
@@ -1895,7 +1895,7 @@ static int codegen_expression_type(FunctionContext *ctx, const ParserNode *node,
       }
 
       base_desc = codegen_make_type_desc(
-          symbol->type_token, symbol->pointer_depth, symbol->is_const);
+        symbol->type_token, symbol->pointer_depth, symbol->is_const);
       if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs, ctx->typedef_count,
                                 base_desc, &resolved_desc)) {
         return 0;
@@ -2173,8 +2173,9 @@ static int codegen_emit_expression(FunctionContext *ctx, const ParserNode *node,
     const ParserNode *param = NULL;
     size_t arg_count = 0;
     size_t index = 0;
-    char(*arg_values)[32] = NULL;
-    char(*arg_types)[32] = NULL;
+    typedef char NameBuffer[32];
+    NameBuffer *arg_values = NULL;
+    NameBuffer *arg_types = NULL;
     char type_name[32];
     TypeDesc return_type;
 
@@ -2220,7 +2221,7 @@ static int codegen_emit_expression(FunctionContext *ctx, const ParserNode *node,
       }
 
       param_type = codegen_make_type_desc(
-          param->type_token, param->pointer_depth, param->is_const);
+        param->type_token, param->pointer_depth, param->is_const);
       if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                                 ctx->typedefs, ctx->typedef_count, param_type,
                                 &param_type)) {
@@ -2280,7 +2281,7 @@ static int codegen_emit_expression(FunctionContext *ctx, const ParserNode *node,
     }
 
     return_type = codegen_make_type_desc(
-        symbol->type_token, symbol->pointer_depth, symbol->is_const);
+      symbol->type_token, symbol->pointer_depth, symbol->is_const);
     if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
                               ctx->typedefs, ctx->typedef_count, return_type,
                               &return_type)) {
@@ -2510,7 +2511,7 @@ static int codegen_emit_expression(FunctionContext *ctx, const ParserNode *node,
       snprintf(value, value_size, "@%.*s", (int)operand->token.length,
                operand->token.start);
       base_desc = codegen_make_type_desc(
-          symbol->type_token, symbol->pointer_depth, symbol->is_const);
+        symbol->type_token, symbol->pointer_depth, symbol->is_const);
       if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs, ctx->typedef_count,
                                 base_desc, &resolved_desc)) {
         return 0;
@@ -3325,7 +3326,7 @@ static int codegen_emit_statement(FunctionContext *ctx,
       }
 
       target_type = codegen_make_type_desc(
-          local->type_token, local->pointer_depth, local->is_const);
+        local->type_token, local->pointer_depth, local->is_const);
       if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs, ctx->typedef_count,
                                 target_type, &target_type)) {
         return 0;
@@ -3366,7 +3367,7 @@ static int codegen_emit_statement(FunctionContext *ctx,
     param = codegen_find_param(ctx, left->token);
     if (param) {
       return codegen_set_error(
-          ctx->codegen, "codegen: assignment to parameter not supported");
+        ctx->codegen, "codegen: assignment to parameter not supported");
     }
 
     global = codegen_find_global(ctx, left->token);
@@ -3387,7 +3388,7 @@ static int codegen_emit_statement(FunctionContext *ctx,
       }
 
       target_type = codegen_make_type_desc(
-          global->type_token, global->pointer_depth, global->is_const);
+        global->type_token, global->pointer_depth, global->is_const);
       if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs, ctx->typedef_count,
                                 target_type, &target_type)) {
         return 0;
@@ -3465,9 +3466,9 @@ static int codegen_emit_statement(FunctionContext *ctx,
     {
       TypeDesc return_type;
 
-      return_type = codegen_make_type_desc(ctx->return_type_token,
-                                           ctx->return_pointer_depth,
-                                           ctx->return_is_const);
+      return_type =
+        codegen_make_type_desc(ctx->return_type_token,
+                               ctx->return_pointer_depth, ctx->return_is_const);
       if (return_type.pointer_depth > 0) {
         if (expr_type.pointer_depth == 0 &&
             codegen_is_null_pointer_literal(node->first_child)) {
@@ -3511,11 +3512,11 @@ static int codegen_emit_statement(FunctionContext *ctx,
 }
 
 static int codegen_emit_function(
-    Codegen *codegen, const ParserNode *node, const GlobalSymbol *globals,
-    size_t global_count, const StructSymbol *structs, size_t struct_count,
-    const TypedefSymbol *typedefs, size_t typedef_count,
-    const EnumSymbol *enums, size_t enum_count, const FunctionSymbol *functions,
-    size_t function_count, FILE *out) {
+  Codegen *codegen, const ParserNode *node, const GlobalSymbol *globals,
+  size_t global_count, const StructSymbol *structs, size_t struct_count,
+  const TypedefSymbol *typedefs, size_t typedef_count, const EnumSymbol *enums,
+  size_t enum_count, const FunctionSymbol *functions, size_t function_count,
+  FILE *out) {
   FunctionContext ctx;
   int terminated = 0;
   TypeInfo type_info;
@@ -3642,7 +3643,7 @@ static int codegen_emit_function(
       TypeDesc param_desc;
 
       param_desc = codegen_make_type_desc(
-          param->type_token, param->pointer_depth, param->is_const);
+        param->type_token, param->pointer_depth, param->is_const);
       if (!codegen_require_type(codegen, structs, struct_count, ctx.typedefs,
                                 ctx.typedef_count, param_desc, &param_desc)) {
         free(ctx.typedefs);
@@ -3889,7 +3890,7 @@ static int codegen_emit_translation_unit(Codegen *codegen,
       TypeDesc alias_desc;
 
       alias_desc = codegen_make_type_desc(
-          child->type_token, child->pointer_depth, child->is_const);
+        child->type_token, child->pointer_depth, child->is_const);
       if (!codegen_require_type(codegen, structs, struct_count, typedefs,
                                 typedef_index, alias_desc, NULL)) {
         goto cleanup;
@@ -3961,7 +3962,7 @@ static int codegen_emit_translation_unit(Codegen *codegen,
                      enumerator->first_child->token.type == TOKEN_PUNCT &&
                      token_is_punct(enumerator->first_child->token, "-") &&
                      enumerator->first_child->first_child->type ==
-                         PARSER_NODE_NUMBER) {
+                       PARSER_NODE_NUMBER) {
             value = -enumerator->first_child->first_child->token.value;
           } else {
             // Simple constant folding fallback or error?

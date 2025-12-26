@@ -572,7 +572,7 @@ static int checker_validate_enum_definition(Checker *checker,
     if (enumerator->first_child) {
       if (enumerator->first_child->next) {
         return checker_set_error(
-            checker, "checker: unexpected enumerator initializer list");
+          checker, "checker: unexpected enumerator initializer list");
       }
       if (!checker_validate_expression(checker, enumerator->first_child)) {
         return 0;

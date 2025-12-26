@@ -4,10 +4,10 @@
 #include "checker.h"
 
 typedef struct Codegen {
-    const char *input;
-    Checker checker;
-    Parser parser;
-    const char *error_message;
+  const char *input;
+  Checker checker;
+  Parser parser;
+  const char *error_message;
 } Codegen;
 
 void codegen_init(Codegen *codegen, const char *input);

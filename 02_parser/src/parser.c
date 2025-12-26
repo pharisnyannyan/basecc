@@ -104,7 +104,7 @@ static int parser_push_typedef(Parser *parser, Token name_token) {
 
   if (parser->typedef_count == parser->typedef_capacity) {
     size_t new_capacity =
-        parser->typedef_capacity ? parser->typedef_capacity * 2 : 8;
+      parser->typedef_capacity ? parser->typedef_capacity * 2 : 8;
 
     entries = realloc(parser->typedefs, new_capacity * sizeof(*entries));
     if (!entries) {
@@ -123,7 +123,9 @@ static int parser_push_typedef(Parser *parser, Token name_token) {
   return 1;
 }
 
-static void parser_push_scope(Parser *parser) { parser->scope_depth++; }
+static void parser_push_scope(Parser *parser) {
+  parser->scope_depth++;
+}
 
 static void parser_pop_scope(Parser *parser) {
   while (parser->typedef_count > 0) {
@@ -165,7 +167,7 @@ static int parser_parse_type_spec(Parser *parser, TypeSpec *spec,
     if (token.type == TOKEN_EXTERN || token.type == TOKEN_STATIC) {
       if (!allow_storage) {
         *error_out = parser_make_error(
-            parser, token, "parser: unexpected storage class specifier");
+          parser, token, "parser: unexpected storage class specifier");
         return 0;
       }
       if (token.type == TOKEN_EXTERN) {
@@ -183,7 +185,7 @@ static int parser_parse_type_spec(Parser *parser, TypeSpec *spec,
 
   if (is_extern && is_static) {
     *error_out = parser_make_error(
-        parser, token, "parser: conflicting storage class specifiers");
+      parser, token, "parser: conflicting storage class specifiers");
     return 0;
   }
 
@@ -192,7 +194,7 @@ static int parser_parse_type_spec(Parser *parser, TypeSpec *spec,
     token = parser->last_token;
     if (token.type != TOKEN_IDENT) {
       *error_out =
-          parser_make_error(parser, token, "parser: expected struct name");
+        parser_make_error(parser, token, "parser: expected struct name");
       return 0;
     }
     type_token = parser_make_struct_type_token(token);
@@ -203,7 +205,7 @@ static int parser_parse_type_spec(Parser *parser, TypeSpec *spec,
     token = parser->last_token;
     if (token.type != TOKEN_IDENT) {
       *error_out =
-          parser_make_error(parser, token, "parser: expected enum name");
+        parser_make_error(parser, token, "parser: expected enum name");
       return 0;
     }
     type_token = parser_make_enum_type_token(token);
@@ -403,7 +405,7 @@ static ParserNode *parser_parse_call(Parser *parser, Token name_token) {
 
   if (!parser_match_punct(parser, ")")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ')'");
+      parser_make_error(parser, parser->last_token, "parser: expected ')'");
     parser_free_node(node);
     return error_node;
   }
@@ -438,7 +440,7 @@ static ParserNode *parser_parse_primary(Parser *parser) {
 
     if (!parser_match_punct(parser, ")")) {
       ParserNode *error_node =
-          parser_make_error(parser, parser->last_token, "parser: expected ')'");
+        parser_make_error(parser, parser->last_token, "parser: expected ')'");
       parser_free_node(expr);
       return error_node;
     }
@@ -478,8 +480,8 @@ static ParserNode *parser_parse_postfix(Parser *parser) {
       }
 
       if (!parser_match_punct(parser, "]")) {
-        ParserNode *error_node = parser_make_error(parser, parser->last_token,
-                                                   "parser: expected ']'");
+        ParserNode *error_node =
+          parser_make_error(parser, parser->last_token, "parser: expected ']'");
         parser_free_node(node);
         parser_free_node(index_expr);
         return error_node;
@@ -509,7 +511,7 @@ static ParserNode *parser_parse_postfix(Parser *parser) {
       field_token = parser->last_token;
       if (field_token.type != TOKEN_IDENT) {
         ParserNode *error_node = parser_make_error(
-            parser, field_token, "parser: expected field identifier");
+          parser, field_token, "parser: expected field identifier");
         parser_free_node(node);
         return error_node;
       }
@@ -579,8 +581,8 @@ static ParserNode *parser_parse_unary(Parser *parser) {
       }
 
       if (!parser_match_punct(parser, ")")) {
-        ParserNode *error_node = parser_make_error(parser, parser->last_token,
-                                                   "parser: expected ')'");
+        ParserNode *error_node =
+          parser_make_error(parser, parser->last_token, "parser: expected ')'");
         parser_free_node(operand);
         return error_node;
       }
@@ -839,15 +841,15 @@ static ParserNode *parser_parse_block(Parser *parser) {
   while (!token_is_punct(parser->last_token, "}")) {
     if (parser->last_token.type == TOKEN_EOF) {
       ParserNode *error_node =
-          parser_make_error(parser, parser->last_token, "parser: expected '}'");
+        parser_make_error(parser, parser->last_token, "parser: expected '}'");
       parser_free_node(block);
       parser_pop_scope(parser);
       return error_node;
     }
 
     if (parser->last_token.type == TOKEN_INVALID) {
-      ParserNode *error_node = parser_make_error(parser, parser->last_token,
-                                                 "parser: invalid token");
+      ParserNode *error_node =
+        parser_make_error(parser, parser->last_token, "parser: invalid token");
       parser_free_node(block);
       parser_pop_scope(parser);
       return error_node;
@@ -886,7 +888,7 @@ static ParserNode *parser_parse_if(Parser *parser) {
 
   if (!parser_match_punct(parser, ")")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ')'");
+      parser_make_error(parser, parser->last_token, "parser: expected ')'");
     parser_free_node(condition);
     return error_node;
   }
@@ -937,7 +939,7 @@ static ParserNode *parser_parse_while(Parser *parser) {
 
   if (!parser_match_punct(parser, ")")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ')'");
+      parser_make_error(parser, parser->last_token, "parser: expected ')'");
     parser_free_node(condition);
     return error_node;
   }
@@ -1006,7 +1008,7 @@ static ParserNode *parser_parse_for(Parser *parser) {
 
     if (!parser_match_punct(parser, ";")) {
       ParserNode *error_node =
-          parser_make_error(parser, parser->last_token, "parser: expected ';'");
+        parser_make_error(parser, parser->last_token, "parser: expected ';'");
       parser_free_node(init);
       parser_free_node(condition);
       return error_node;
@@ -1025,7 +1027,7 @@ static ParserNode *parser_parse_for(Parser *parser) {
     increment = parser_parse_assignment_expression(parser);
   } else {
     ParserNode *error_node = parser_make_error(
-        parser, parser->last_token, "parser: expected for increment");
+      parser, parser->last_token, "parser: expected for increment");
     parser_free_node(init);
     parser_free_node(condition);
     return error_node;
@@ -1045,7 +1047,7 @@ static ParserNode *parser_parse_for(Parser *parser) {
 
   if (!parser_match_punct(parser, ")")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ')'");
+      parser_make_error(parser, parser->last_token, "parser: expected ')'");
     parser_free_node(init);
     parser_free_node(condition);
     parser_free_node(increment);
@@ -1088,7 +1090,7 @@ static ParserNode *parser_parse_return(Parser *parser) {
 
   if (!parser_match_punct(parser, ";")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ';'");
+      parser_make_error(parser, parser->last_token, "parser: expected ';'");
     parser_free_node(expr);
     return error_node;
   }
@@ -1187,7 +1189,7 @@ static ParserNode *parser_parse_statement(Parser *parser) {
 static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
                                             Token type_token) {
   ParserNode *node =
-      parser_alloc_node(parser, PARSER_NODE_DECLARATION, name_token);
+    parser_alloc_node(parser, PARSER_NODE_DECLARATION, name_token);
   if (!node) {
     return NULL;
   }
@@ -1198,8 +1200,8 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
     Token length_token = parser->last_token;
 
     if (length_token.type != TOKEN_NUMBER || length_token.value <= 0) {
-      ParserNode *error_node = parser_make_error(parser, length_token,
-                                                 "parser: expected array size");
+      ParserNode *error_node =
+        parser_make_error(parser, length_token, "parser: expected array size");
       parser_free_node(node);
       return error_node;
     }
@@ -1208,7 +1210,7 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
 
     if (!parser_match_punct(parser, "]")) {
       ParserNode *error_node =
-          parser_make_error(parser, parser->last_token, "parser: expected ']'");
+        parser_make_error(parser, parser->last_token, "parser: expected ']'");
       parser_free_node(node);
       return error_node;
     }
@@ -1230,7 +1232,7 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
   if (!parser_match_punct(parser, ";")) {
     Token error_token = parser->last_token;
     ParserNode *error_node =
-        parser_make_error(parser, error_token, "parser: expected ';'");
+      parser_make_error(parser, error_token, "parser: expected ';'");
     parser_free_node(node);
     return error_node;
   }
@@ -1252,8 +1254,8 @@ static ParserNode *parser_parse_typedef(Parser *parser) {
 
   if (spec.is_extern) {
     return parser_make_error(
-        parser, parser->last_token,
-        "parser: extern not allowed for local declaration");
+      parser, parser->last_token,
+      "parser: extern not allowed for local declaration");
   }
 
   name_token = parser->last_token;
@@ -1298,7 +1300,7 @@ static ParserNode *parser_parse_assignment_statement(Parser *parser) {
 
   if (!parser_match_punct(parser, ";")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ';'");
+      parser_make_error(parser, parser->last_token, "parser: expected ';'");
     parser_free_node(node);
     return error_node;
   }
@@ -1318,7 +1320,7 @@ static ParserNode *parser_parse_assignment_expression(Parser *parser) {
 
   if (!parser_match_punct(parser, "=")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected '='");
+      parser_make_error(parser, parser->last_token, "parser: expected '='");
     parser_free_node(left);
     return error_node;
   }
@@ -1357,8 +1359,8 @@ static ParserNode *parser_parse_struct_field(Parser *parser) {
 
   if (spec.is_extern) {
     return parser_make_error(
-        parser, parser->last_token,
-        "parser: extern not allowed for local declaration");
+      parser, parser->last_token,
+      "parser: extern not allowed for local declaration");
   }
 
   token = parser->last_token;
@@ -1423,14 +1425,14 @@ static ParserNode *parser_parse_struct_definition(Parser *parser,
 
   if (!parser_match_punct(parser, "}")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected '}'");
+      parser_make_error(parser, parser->last_token, "parser: expected '}'");
     parser_free_node(node);
     return error_node;
   }
 
   if (!parser_match_punct(parser, ";")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ';'");
+      parser_make_error(parser, parser->last_token, "parser: expected ';'");
     parser_free_node(node);
     return error_node;
   }
@@ -1453,8 +1455,8 @@ static ParserNode *parser_parse_local_declaration(Parser *parser) {
 
   if (spec.is_extern) {
     return parser_make_error(
-        parser, parser->last_token,
-        "parser: extern not allowed for local declaration");
+      parser, parser->last_token,
+      "parser: extern not allowed for local declaration");
   }
 
   token = parser->last_token;
@@ -1469,7 +1471,7 @@ static ParserNode *parser_parse_local_declaration(Parser *parser) {
   parser_next(parser);
 
   ParserNode *declaration =
-      parser_parse_declaration(parser, token, spec.type_token);
+    parser_parse_declaration(parser, token, spec.type_token);
   if (declaration && declaration->type != PARSER_NODE_INVALID) {
     declaration->pointer_depth = spec.pointer_depth;
     declaration->is_const = spec.is_const;
@@ -1569,7 +1571,7 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
 
   if (!parser_match_punct(parser, ")")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ')'");
+      parser_make_error(parser, parser->last_token, "parser: expected ')'");
     parser_free_node(params);
     return error_node;
   }
@@ -1590,13 +1592,13 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
     }
 
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, message);
+      parser_make_error(parser, parser->last_token, message);
     parser_free_node(params);
     return error_node;
   }
 
   ParserNode *node =
-      parser_alloc_node(parser, PARSER_NODE_FUNCTION, name_token);
+    parser_alloc_node(parser, PARSER_NODE_FUNCTION, name_token);
   if (!node) {
     parser_free_node(params);
     parser_free_node(body);
@@ -1695,14 +1697,14 @@ static ParserNode *parser_parse_enum_definition(Parser *parser,
 
   if (!parser_match_punct(parser, "}")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected '}'");
+      parser_make_error(parser, parser->last_token, "parser: expected '}'");
     parser_free_node(node);
     return error_node;
   }
 
   if (!parser_match_punct(parser, ";")) {
     ParserNode *error_node =
-        parser_make_error(parser, parser->last_token, "parser: expected ';'");
+      parser_make_error(parser, parser->last_token, "parser: expected ';'");
     parser_free_node(node);
     return error_node;
   }
@@ -1778,7 +1780,7 @@ static ParserNode *parser_parse_external(Parser *parser) {
 
   if (token_is_punct(parser->last_token, "(")) {
     ParserNode *function =
-        parser_parse_function(parser, token, spec.type_token, spec.is_extern);
+      parser_parse_function(parser, token, spec.type_token, spec.is_extern);
     if (function && function->type != PARSER_NODE_INVALID) {
       function->pointer_depth = spec.pointer_depth;
       function->is_const = spec.is_const;
@@ -1789,7 +1791,7 @@ static ParserNode *parser_parse_external(Parser *parser) {
   }
 
   ParserNode *declaration =
-      parser_parse_declaration(parser, token, spec.type_token);
+    parser_parse_declaration(parser, token, spec.type_token);
   if (declaration && declaration->type != PARSER_NODE_INVALID) {
     declaration->pointer_depth = spec.pointer_depth;
     declaration->is_const = spec.is_const;
@@ -1800,8 +1802,8 @@ static ParserNode *parser_parse_external(Parser *parser) {
 }
 
 ParserNode *parser_parse(Parser *parser) {
-  ParserNode *root = parser_alloc_node(parser, PARSER_NODE_TRANSLATION_UNIT,
-                                       parser->last_token);
+  ParserNode *root =
+    parser_alloc_node(parser, PARSER_NODE_TRANSLATION_UNIT, parser->last_token);
   ParserNode **tail = NULL;
 
   if (!root) {
@@ -1812,8 +1814,8 @@ ParserNode *parser_parse(Parser *parser) {
 
   while (parser->last_token.type != TOKEN_EOF) {
     if (parser->last_token.type == TOKEN_INVALID) {
-      ParserNode *error_node = parser_make_error(parser, parser->last_token,
-                                                 "parser: invalid token");
+      ParserNode *error_node =
+        parser_make_error(parser, parser->last_token, "parser: invalid token");
       parser_free_node(root);
       return error_node;
     }
@@ -1843,4 +1845,6 @@ void parser_free_node(ParserNode *node) {
   free(node);
 }
 
-const char *parser_error(const Parser *parser) { return parser->error_message; }
+const char *parser_error(const Parser *parser) {
+  return parser->error_message;
+}

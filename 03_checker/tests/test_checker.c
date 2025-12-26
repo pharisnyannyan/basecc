@@ -98,10 +98,10 @@ TEST(check_static_declarations, "check static declarations") {
   Checker checker;
 
   checker_init(
-      &checker,
-      "static int global;"
-      "const static char *ptr;"
-      "int main(){static short local=2; static int *p=&global; return 0;}");
+    &checker,
+    "static int global;"
+    "const static char *ptr;"
+    "int main(){static short local=2; static int *p=&global; return 0;}");
 
   ASSERT_TRUE(checker_check(&checker), "expected check success");
   ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -137,8 +137,8 @@ TEST(check_for_loop, "check for loop") {
   Checker checker;
 
   checker_init(
-      &checker,
-      "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
+    &checker,
+    "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
 
   ASSERT_TRUE(checker_check(&checker), "expected check success");
   ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -162,8 +162,8 @@ TEST(check_function_call, "check function call") {
   Checker checker;
 
   checker_init(
-      &checker,
-      "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
+    &checker,
+    "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
 
   ASSERT_TRUE(checker_check(&checker), "expected check success");
   ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -199,8 +199,8 @@ TEST(check_dereference_assignment, "check dereference assignment") {
   Checker checker;
 
   checker_init(
-      &checker,
-      "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
+    &checker,
+    "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
 
   ASSERT_TRUE(checker_check(&checker), "expected check success");
   ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -356,8 +356,8 @@ TEST(check_expected_number, "check expected number") {
 
   ASSERT_TRUE(!checker_check(&checker), "expected check failure");
   ASSERT_TRUE(
-      test_error_contains(checker_error(&checker), "expected expression"),
-      "expected expression error");
+    test_error_contains(checker_error(&checker), "expected expression"),
+    "expected expression error");
 
   return 1;
 }
@@ -381,9 +381,9 @@ TEST(check_enum_definition, "check enum definition") {
 
   checker_init(&checker, "enum { 123 };");
   ASSERT_TRUE(!checker_check(&checker), "expected check failure");
-  ASSERT_TRUE(test_error_contains(checker_error(&checker),
-                                  "parser: expected enum name"),
-              "expected enum name error");
+  ASSERT_TRUE(
+    test_error_contains(checker_error(&checker), "parser: expected enum name"),
+    "expected enum name error");
 
   return 1;
 }
@@ -392,4 +392,6 @@ TEST(check_enum_definition, "check enum definition") {
 
 static const TestCase tests[] = {TEST_LIST(TEST_ENTRY)};
 
-int main(void) { return test_run(tests, sizeof(tests) / sizeof(tests[0])); }
+int main(void) {
+  return test_run(tests, sizeof(tests) / sizeof(tests[0]));
+}

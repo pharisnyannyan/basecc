@@ -183,9 +183,9 @@ TEST(negative_numbers, "negative numbers") {
 TEST(keywords, "keywords") {
   Lexer lexer;
   lexer_init(
-      &lexer,
-      "if else while for switch case break continue return "
-      "sizeof typedef extern static void const char short int struct enum");
+    &lexer,
+    "if else while for switch case break continue return "
+    "sizeof typedef extern static void const char short int struct enum");
 
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_IF, "if");
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_ELSE, "else");
@@ -678,4 +678,6 @@ TEST(whitespace_only, "whitespace") {
 
 static const TestCase tests[] = {TEST_LIST(TEST_ENTRY)};
 
-int main(void) { return test_run(tests, sizeof(tests) / sizeof(tests[0])); }
+int main(void) {
+  return test_run(tests, sizeof(tests) / sizeof(tests[0]));
+}

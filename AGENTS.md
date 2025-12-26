@@ -27,3 +27,11 @@ These guidelines apply to the entire repository.
 - Prefer simple Makefiles and incremental build rules.
 - Avoid heavy build systems or generators.
 - CI must run the same top-level test command on pushes and pull requests.
+
+## Formatting
+- Do not worry about code formatting while implementing changes.
+- Once finished with the task, run the formatting command to ensure consistency:
+  ```bash
+  make format
+  ```
+- All code must pass the CI formatting check.

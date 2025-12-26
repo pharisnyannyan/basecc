@@ -3,9 +3,13 @@
 #include <ctype.h>
 #include <string.h>
 
-static int is_ident_start(int ch) { return isalpha(ch) || ch == '_'; }
+static int is_ident_start(int ch) {
+  return isalpha(ch) || ch == '_';
+}
 
-static int is_ident_continue(int ch) { return isalnum(ch) || ch == '_'; }
+static int is_ident_continue(int ch) {
+  return isalnum(ch) || ch == '_';
+}
 
 static Token make_token(TokenType type, const char *start, size_t length) {
   Token token;
@@ -43,7 +47,7 @@ static Token lex_number(Lexer *lexer) {
   }
 
   Token token =
-      make_token(TOKEN_NUMBER, lexer->input + start, lexer->pos - start);
+    make_token(TOKEN_NUMBER, lexer->input + start, lexer->pos - start);
   token.value = value;
   return token;
 }
@@ -59,7 +63,7 @@ static Token lex_negative_number(Lexer *lexer) {
   }
 
   Token token =
-      make_token(TOKEN_NUMBER, lexer->input + start, lexer->pos - start);
+    make_token(TOKEN_NUMBER, lexer->input + start, lexer->pos - start);
   token.value = -value;
   return token;
 }

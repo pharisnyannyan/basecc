@@ -1,10 +1,9 @@
-int sum_down()
-{
-    int sum = 0;
+int sum_down() {
+  int sum = 0;
 
-    for (int i = 5; i; i = i - 1) {
-        sum = sum + i;
-    }
+  for (int i = 5; i; i = i - 1) {
+    sum = sum + i;
+  }
 
-    return sum;
+  return sum;
 }

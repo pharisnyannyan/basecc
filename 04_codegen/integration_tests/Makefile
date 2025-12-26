@@ -6,10 +6,10 @@ CPPFLAGS ?= -I../include -I../../03_checker/include -I../../02_parser/include \
 
 BUILD_DIR := build
 LL := ../build/codegen_arithmetic.ll
-INPUT := ../tests/testdata/arithmetic_runtime.c
+INPUT := testdata/arithmetic_runtime.c
 EXPECTED := arithmetic_driver_expected.txt
 FIB_LL := ../build/codegen_fibonacci.ll
-FIB_INPUT := ../tests/testdata/fibonacci.c
+FIB_INPUT := testdata/fibonacci.c
 FIB_EXPECTED := fibonacci_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a

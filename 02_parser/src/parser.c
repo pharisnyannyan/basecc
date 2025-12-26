@@ -3,11 +3,27 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct TypedefEntry {
+    const char *name;
+    size_t length;
+    int scope_depth;
+} TypedefEntry;
+
+typedef struct TypeSpec {
+    Token type_token;
+    int pointer_depth;
+    int is_const;
+} TypeSpec;
+
 void parser_init(Parser *parser, const char *input)
 {
     lexer_init(&parser->lexer, input);
     parser->error_message = NULL;
     parser->last_token = lexer_next(&parser->lexer);
+    parser->typedefs = NULL;
+    parser->typedef_count = 0;
+    parser->typedef_capacity = 0;
+    parser->scope_depth = 0;
 }
 
 Token parser_next(Parser *parser)
@@ -27,6 +43,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
     node->token = token;
     node->type_token = token;
     node->pointer_depth = 0;
+    node->is_const = 0;
     node->first_child = NULL;
     node->next = NULL;
 }
@@ -50,7 +67,159 @@ static int token_is_type(Token token)
 {
     return token.type == TOKEN_INT
         || token.type == TOKEN_SHORT
-        || token.type == TOKEN_CHAR;
+        || token.type == TOKEN_CHAR
+        || token.type == TOKEN_VOID;
+}
+
+static int parser_name_matches(Token token, const char *name, size_t length)
+{
+    if (token.length != length) {
+        return 0;
+    }
+
+    return strncmp(token.start, name, length) == 0;
+}
+
+static int parser_is_typedef_name(const Parser *parser, Token token)
+{
+    size_t index = 0;
+
+    if (token.type != TOKEN_IDENT) {
+        return 0;
+    }
+
+    for (index = parser->typedef_count; index > 0; index--) {
+        const TypedefEntry *entry = &parser->typedefs[index - 1];
+
+        if (entry->scope_depth > parser->scope_depth) {
+            continue;
+        }
+
+        if (parser_name_matches(token, entry->name, entry->length)) {
+            return 1;
+        }
+    }
+
+    return 0;
+}
+
+static int parser_push_typedef(Parser *parser, Token name_token)
+{
+    TypedefEntry *entries = NULL;
+
+    if (parser->typedef_count == parser->typedef_capacity) {
+        size_t new_capacity = parser->typedef_capacity ? parser->typedef_capacity * 2 : 8;
+
+        entries = realloc(parser->typedefs, new_capacity * sizeof(*entries));
+        if (!entries) {
+            parser->error_message = "parser: out of memory";
+            return 0;
+        }
+        parser->typedefs = entries;
+        parser->typedef_capacity = new_capacity;
+    }
+
+    entries = parser->typedefs;
+    entries[parser->typedef_count].name = name_token.start;
+    entries[parser->typedef_count].length = name_token.length;
+    entries[parser->typedef_count].scope_depth = parser->scope_depth;
+    parser->typedef_count++;
+    return 1;
+}
+
+static void parser_push_scope(Parser *parser)
+{
+    parser->scope_depth++;
+}
+
+static void parser_pop_scope(Parser *parser)
+{
+    while (parser->typedef_count > 0) {
+        TypedefEntry *entry = &parser->typedefs[parser->typedef_count - 1];
+
+        if (entry->scope_depth != parser->scope_depth) {
+            break;
+        }
+        parser->typedef_count--;
+    }
+
+    if (parser->scope_depth > 0) {
+        parser->scope_depth--;
+    }
+}
+
+static ParserNode *parser_make_error(Parser *parser, Token token,
+    const char *message);
+static Token parser_make_struct_type_token(Token name_token);
+
+static int parser_parse_type_spec(Parser *parser,
+    TypeSpec *spec,
+    ParserNode **error_out)
+{
+    Token token = parser->last_token;
+    Token type_token;
+    int pointer_depth = 0;
+    int is_const = 0;
+
+    while (token.type == TOKEN_CONST) {
+        is_const = 1;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
+    if (token.type == TOKEN_STRUCT) {
+        parser_next(parser);
+        token = parser->last_token;
+        if (token.type != TOKEN_IDENT) {
+            *error_out = parser_make_error(parser, token,
+                "parser: expected struct name");
+            return 0;
+        }
+        type_token = parser_make_struct_type_token(token);
+        parser_next(parser);
+        token = parser->last_token;
+    } else if (token_is_type(token) || parser_is_typedef_name(parser, token)) {
+        type_token = token;
+        parser_next(parser);
+        token = parser->last_token;
+    } else {
+        *error_out = parser_make_error(parser, token, "parser: expected type");
+        return 0;
+    }
+
+    while (token.type == TOKEN_CONST) {
+        is_const = 1;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
+    while (token_is_punct(token, "*")) {
+        pointer_depth++;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
+    spec->type_token = type_token;
+    spec->pointer_depth = pointer_depth;
+    spec->is_const = is_const;
+    return 1;
+}
+
+static int parser_is_type_start(const Parser *parser, Token token)
+{
+    if (token.type == TOKEN_CONST) {
+        return 1;
+    }
+
+    if (token.type == TOKEN_STRUCT) {
+        return 1;
+    }
+
+    if (token_is_type(token)) {
+        return 1;
+    }
+
+    return parser_is_typedef_name(parser, token);
 }
 
 static Token parser_make_struct_type_token(Token name_token)
@@ -126,9 +295,33 @@ static ParserNode *parser_parse_parameter(Parser *parser);
 static ParserNode *parser_parse_assignment_statement(Parser *parser);
 static ParserNode *parser_parse_assignment_expression(Parser *parser);
 static ParserNode *parser_parse_local_declaration(Parser *parser);
+static ParserNode *parser_parse_typedef(Parser *parser);
 static ParserNode *parser_parse_struct_definition(Parser *parser,
     Token name_token);
 static ParserNode *parser_parse_struct_field(Parser *parser);
+
+typedef struct ParserSnapshot {
+    size_t pos;
+    Token last_token;
+    const char *error_message;
+} ParserSnapshot;
+
+static ParserSnapshot parser_snapshot(Parser *parser)
+{
+    ParserSnapshot snapshot;
+
+    snapshot.pos = parser->lexer.pos;
+    snapshot.last_token = parser->last_token;
+    snapshot.error_message = parser->error_message;
+    return snapshot;
+}
+
+static void parser_restore(Parser *parser, ParserSnapshot snapshot)
+{
+    parser->lexer.pos = snapshot.pos;
+    parser->last_token = snapshot.last_token;
+    parser->error_message = snapshot.error_message;
+}
 
 static ParserNode *parser_parse_call(Parser *parser, Token name_token)
 {
@@ -285,37 +478,12 @@ static ParserNode *parser_parse_unary(Parser *parser)
         parser_next(parser);
 
         if (parser_match_punct(parser, "(")) {
-            Token type_token;
-            int pointer_depth = 0;
-            Token inner_token = parser->last_token;
+            TypeSpec spec;
+            ParserNode *error_node = NULL;
 
-            if (inner_token.type == TOKEN_STRUCT
-                || token_is_type(inner_token)) {
-                if (inner_token.type == TOKEN_STRUCT) {
-                    parser_next(parser);
-                    inner_token = parser->last_token;
-                    if (inner_token.type != TOKEN_IDENT) {
-                        return parser_make_error(parser, inner_token,
-                            "parser: expected struct name");
-                    }
-                    type_token = parser_make_struct_type_token(inner_token);
-                    parser_next(parser);
-                    inner_token = parser->last_token;
-                } else {
-                    type_token = inner_token;
-                    parser_next(parser);
-                    inner_token = parser->last_token;
-                }
-
-                while (token_is_punct(inner_token, "*")) {
-                    pointer_depth++;
-                    parser_next(parser);
-                    inner_token = parser->last_token;
-                }
-
-                if (inner_token.type == TOKEN_INVALID) {
-                    return parser_make_error(parser, inner_token,
-                        "parser: invalid token");
+            if (parser_is_type_start(parser, parser->last_token)) {
+                if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+                    return error_node;
                 }
 
                 if (!parser_match_punct(parser, ")")) {
@@ -327,8 +495,9 @@ static ParserNode *parser_parse_unary(Parser *parser)
                 if (!node) {
                     return NULL;
                 }
-                node->type_token = type_token;
-                node->pointer_depth = pointer_depth;
+                node->type_token = spec.type_token;
+                node->pointer_depth = spec.pointer_depth;
+                node->is_const = spec.is_const;
                 return node;
             }
 
@@ -366,6 +535,42 @@ static ParserNode *parser_parse_unary(Parser *parser)
         }
         node->first_child = operand;
         return node;
+    }
+
+    if (token_is_punct(token, "(")) {
+        ParserSnapshot snapshot = parser_snapshot(parser);
+        ParserNode *error_node = NULL;
+        TypeSpec spec;
+
+        parser_next(parser);
+        if (parser_is_type_start(parser, parser->last_token)) {
+            if (parser_parse_type_spec(parser, &spec, &error_node)
+                && parser_match_punct(parser, ")")) {
+                ParserNode *operand = parser_parse_unary(parser);
+                ParserNode *node = NULL;
+
+                if (!operand || operand->type == PARSER_NODE_INVALID) {
+                    return operand;
+                }
+
+                node = parser_alloc_node(parser, PARSER_NODE_CAST, token);
+                if (!node) {
+                    parser_free_node(operand);
+                    return NULL;
+                }
+
+                node->type_token = spec.type_token;
+                node->pointer_depth = spec.pointer_depth;
+                node->is_const = spec.is_const;
+                node->first_child = operand;
+                return node;
+            }
+        }
+
+        if (error_node) {
+            parser_free_node(error_node);
+        }
+        parser_restore(parser, snapshot);
     }
 
     if (token_is_punct(token, "!")
@@ -565,6 +770,7 @@ static ParserNode *parser_parse_block(Parser *parser)
         return NULL;
     }
 
+    parser_push_scope(parser);
     tail = &block->first_child;
 
     while (!token_is_punct(parser->last_token, "}")) {
@@ -573,6 +779,7 @@ static ParserNode *parser_parse_block(Parser *parser)
                 parser->last_token,
                 "parser: expected '}'");
             parser_free_node(block);
+            parser_pop_scope(parser);
             return error_node;
         }
 
@@ -581,12 +788,14 @@ static ParserNode *parser_parse_block(Parser *parser)
                 parser->last_token,
                 "parser: invalid token");
             parser_free_node(block);
+            parser_pop_scope(parser);
             return error_node;
         }
 
         ParserNode *stmt = parser_parse_statement(parser);
         if (!stmt || stmt->type == PARSER_NODE_INVALID) {
             parser_free_node(block);
+            parser_pop_scope(parser);
             return stmt;
         }
 
@@ -595,6 +804,7 @@ static ParserNode *parser_parse_block(Parser *parser)
     }
 
     parser_next(parser);
+    parser_pop_scope(parser);
     return block;
 }
 
@@ -897,11 +1107,11 @@ static ParserNode *parser_parse_statement(Parser *parser)
         return parser_parse_continue(parser);
     }
 
-    if (token.type == TOKEN_STRUCT) {
-        return parser_parse_local_declaration(parser);
+    if (token.type == TOKEN_TYPEDEF) {
+        return parser_parse_typedef(parser);
     }
 
-    if (token_is_type(token)) {
+    if (parser_is_type_start(parser, token)) {
         return parser_parse_local_declaration(parser);
     }
 
@@ -949,6 +1159,53 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
             "parser: expected ';'");
         parser_free_node(node);
         return error_node;
+    }
+
+    return node;
+}
+
+static ParserNode *parser_parse_typedef(Parser *parser)
+{
+    Token name_token;
+    TypeSpec spec;
+    ParserNode *node = NULL;
+    ParserNode *error_node = NULL;
+
+    parser_next(parser);
+
+    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+        return error_node;
+    }
+
+    name_token = parser->last_token;
+    if (name_token.type != TOKEN_IDENT) {
+        return parser_make_error(parser, name_token,
+            "parser: expected identifier");
+    }
+
+    parser_next(parser);
+    if (parser_match_punct(parser, "=")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: unexpected typedef initializer");
+    }
+
+    if (!parser_match_punct(parser, ";")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected ';'");
+    }
+
+    node = parser_alloc_node(parser, PARSER_NODE_TYPEDEF, name_token);
+    if (!node) {
+        return NULL;
+    }
+
+    node->type_token = spec.type_token;
+    node->pointer_depth = spec.pointer_depth;
+    node->is_const = spec.is_const;
+
+    if (!parser_push_typedef(parser, name_token)) {
+        parser_free_node(node);
+        return NULL;
     }
 
     return node;
@@ -1011,38 +1268,19 @@ static ParserNode *parser_parse_assignment_expression(Parser *parser)
 static ParserNode *parser_parse_struct_field(Parser *parser)
 {
     Token token = parser->last_token;
-    Token type_token;
-    int pointer_depth = 0;
+    TypeSpec spec;
     ParserNode *node = NULL;
+    ParserNode *error_node = NULL;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (token.type == TOKEN_STRUCT) {
-        parser_next(parser);
-        token = parser->last_token;
-        if (token.type != TOKEN_IDENT) {
-            return parser_make_error(parser, token,
-                "parser: expected struct name");
-        }
-        type_token = parser_make_struct_type_token(token);
-        parser_next(parser);
-        token = parser->last_token;
-    } else if (token_is_type(token)) {
-        type_token = token;
-        parser_next(parser);
-        token = parser->last_token;
-    } else {
-        return parser_make_error(parser, token, "parser: expected type");
+    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+        return error_node;
     }
 
-    while (token_is_punct(token, "*")) {
-        pointer_depth++;
-        parser_next(parser);
-        token = parser->last_token;
-    }
-
+    token = parser->last_token;
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -1067,8 +1305,9 @@ static ParserNode *parser_parse_struct_field(Parser *parser)
         return NULL;
     }
 
-    node->type_token = type_token;
-    node->pointer_depth = pointer_depth;
+    node->type_token = spec.type_token;
+    node->pointer_depth = spec.pointer_depth;
+    node->is_const = spec.is_const;
     return node;
 }
 
@@ -1122,38 +1361,18 @@ static ParserNode *parser_parse_struct_definition(Parser *parser,
 static ParserNode *parser_parse_local_declaration(Parser *parser)
 {
     Token token = parser->last_token;
-    Token type_token;
-    int pointer_depth = 0;
+    TypeSpec spec;
+    ParserNode *error_node = NULL;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (token.type == TOKEN_STRUCT) {
-        parser_next(parser);
-        token = parser->last_token;
-        if (token.type != TOKEN_IDENT) {
-            return parser_make_error(parser, token,
-                "parser: expected struct name");
-        }
-
-        type_token = parser_make_struct_type_token(token);
-        parser_next(parser);
-        token = parser->last_token;
-    } else if (token_is_type(token)) {
-        type_token = token;
-        parser_next(parser);
-        token = parser->last_token;
-    } else {
-        return parser_make_error(parser, token, "parser: expected type");
+    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+        return error_node;
     }
 
-    while (token_is_punct(token, "*")) {
-        pointer_depth++;
-        parser_next(parser);
-        token = parser->last_token;
-    }
-
+    token = parser->last_token;
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -1165,9 +1384,10 @@ static ParserNode *parser_parse_local_declaration(Parser *parser)
     parser_next(parser);
 
     ParserNode *declaration = parser_parse_declaration(parser, token,
-        type_token);
+        spec.type_token);
     if (declaration && declaration->type != PARSER_NODE_INVALID) {
-        declaration->pointer_depth = pointer_depth;
+        declaration->pointer_depth = spec.pointer_depth;
+        declaration->is_const = spec.is_const;
     }
 
     return declaration;
@@ -1176,39 +1396,19 @@ static ParserNode *parser_parse_local_declaration(Parser *parser)
 static ParserNode *parser_parse_parameter(Parser *parser)
 {
     Token token = parser->last_token;
-    Token type_token;
+    TypeSpec spec;
     ParserNode *node = NULL;
-    int pointer_depth = 0;
+    ParserNode *error_node = NULL;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (token.type == TOKEN_STRUCT) {
-        parser_next(parser);
-        token = parser->last_token;
-        if (token.type != TOKEN_IDENT) {
-            return parser_make_error(parser, token,
-                "parser: expected struct name");
-        }
-
-        type_token = parser_make_struct_type_token(token);
-        parser_next(parser);
-        token = parser->last_token;
-    } else if (token_is_type(token)) {
-        type_token = token;
-        parser_next(parser);
-        token = parser->last_token;
-    } else {
-        return parser_make_error(parser, token, "parser: expected type");
+    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+        return error_node;
     }
 
-    while (token_is_punct(token, "*")) {
-        pointer_depth++;
-        parser_next(parser);
-        token = parser->last_token;
-    }
-
+    token = parser->last_token;
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -1224,8 +1424,9 @@ static ParserNode *parser_parse_parameter(Parser *parser)
         return NULL;
     }
 
-    node->type_token = type_token;
-    node->pointer_depth = pointer_depth;
+    node->type_token = spec.type_token;
+    node->pointer_depth = spec.pointer_depth;
+    node->is_const = spec.is_const;
     return node;
 }
 
@@ -1304,78 +1505,41 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
 static ParserNode *parser_parse_external(Parser *parser)
 {
     Token token = parser->last_token;
-    int pointer_depth = 0;
+    TypeSpec spec;
+    ParserNode *error_node = NULL;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
+    if (token.type == TOKEN_TYPEDEF) {
+        return parser_parse_typedef(parser);
+    }
+
     if (token.type == TOKEN_STRUCT) {
+        ParserSnapshot snapshot = parser_snapshot(parser);
+        Token name_token;
+
         parser_next(parser);
-        token = parser->last_token;
-        if (token.type != TOKEN_IDENT) {
-            return parser_make_error(parser, token,
+        name_token = parser->last_token;
+        if (name_token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, name_token,
                 "parser: expected struct name");
         }
 
-        Token name_token = token;
-        Token type_token = parser_make_struct_type_token(token);
         parser_next(parser);
-        token = parser->last_token;
-
-        if (token_is_punct(token, "{")) {
+        if (token_is_punct(parser->last_token, "{")) {
             return parser_parse_struct_definition(parser, name_token);
         }
 
-        while (token_is_punct(token, "*")) {
-            pointer_depth++;
-            parser_next(parser);
-            token = parser->last_token;
-        }
-
-        if (token.type == TOKEN_INVALID) {
-            return parser_make_error(parser, token, "parser: invalid token");
-        }
-
-        if (token.type != TOKEN_IDENT) {
-            return parser_make_error(parser, token,
-                "parser: expected identifier");
-        }
-
-        parser_next(parser);
-
-        if (token_is_punct(parser->last_token, "(")) {
-            ParserNode *function = parser_parse_function(parser, token,
-                type_token);
-            if (function && function->type != PARSER_NODE_INVALID) {
-                function->pointer_depth = pointer_depth;
-            }
-            return function;
-        }
-
-        ParserNode *declaration = parser_parse_declaration(parser, token,
-            type_token);
-        if (declaration && declaration->type != PARSER_NODE_INVALID) {
-            declaration->pointer_depth = pointer_depth;
-        }
-        return declaration;
+        parser_restore(parser, snapshot);
     }
 
-    if (!token_is_type(token)) {
-        return parser_make_error(parser, token, "parser: expected type");
+    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+        return error_node;
     }
 
-    Token type_token = token;
-
-    parser_next(parser);
     token = parser->last_token;
-
-    while (token_is_punct(token, "*")) {
-        pointer_depth++;
-        parser_next(parser);
-        token = parser->last_token;
-    }
-
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
     }
@@ -1387,17 +1551,20 @@ static ParserNode *parser_parse_external(Parser *parser)
     parser_next(parser);
 
     if (token_is_punct(parser->last_token, "(")) {
-        ParserNode *function = parser_parse_function(parser, token, type_token);
+        ParserNode *function = parser_parse_function(parser, token,
+            spec.type_token);
         if (function && function->type != PARSER_NODE_INVALID) {
-            function->pointer_depth = pointer_depth;
+            function->pointer_depth = spec.pointer_depth;
+            function->is_const = spec.is_const;
         }
         return function;
     }
 
     ParserNode *declaration = parser_parse_declaration(parser, token,
-        type_token);
+        spec.type_token);
     if (declaration && declaration->type != PARSER_NODE_INVALID) {
-        declaration->pointer_depth = pointer_depth;
+        declaration->pointer_depth = spec.pointer_depth;
+        declaration->is_const = spec.is_const;
     }
     return declaration;
 }

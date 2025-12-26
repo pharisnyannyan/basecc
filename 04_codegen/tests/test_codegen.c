@@ -13,6 +13,7 @@
     X(generate_defaults, "generate default initializers") \
     X(generate_pointer_globals, "generate pointer globals") \
     X(generate_pointer_return, "generate pointer return") \
+    X(generate_typedef_casts, "generate typedef casts") \
     X(generate_struct_definitions, "generate struct definitions") \
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_loop_control, "generate loop control") \
@@ -20,7 +21,8 @@
     X(generate_arithmetic_function, "generate arithmetic function") \
     X(generate_logical_function, "generate logical operators") \
     X(generate_sizeof, "generate sizeof expressions") \
-    X(check_invalid_syntax, "reject invalid syntax")
+    X(check_invalid_syntax, "reject invalid syntax") \
+    X(check_const_assignment, "reject const assignment")
 
 static char *read_file(const char *path, size_t *size_out)
 {
@@ -225,6 +227,17 @@ TEST(generate_pointer_return, "generate pointer return")
     return run_codegen_fixture(&fixture);
 }
 
+TEST(generate_typedef_casts, "generate typedef casts")
+{
+    CodegenFixture fixture = {
+        "codegen_typedef_casts",
+        "tests/testdata/typedef_casts.c",
+        "tests/testdata/typedef_casts.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
 TEST(generate_struct_definitions, "generate struct definitions")
 {
     CodegenFixture fixture = {
@@ -319,6 +332,28 @@ TEST(check_invalid_syntax, "reject invalid syntax")
         "expected codegen failure");
     ASSERT_TRUE(test_error_contains(codegen_error(&codegen), "expected expression"),
         "expected expression error");
+
+    free(source);
+    return 1;
+}
+
+TEST(check_const_assignment, "reject const assignment")
+{
+    Codegen codegen;
+    char *source = NULL;
+
+    source = read_file("tests/testdata/const_assignment.c", NULL);
+    if (!source) {
+        failf("expected fixture input");
+        return 0;
+    }
+
+    codegen_init(&codegen, source);
+
+    ASSERT_TRUE(!codegen_emit(&codegen, "build/test_codegen_const.ll"),
+        "expected codegen failure");
+    ASSERT_TRUE(test_error_contains(codegen_error(&codegen), "const"),
+        "expected const assignment error");
 
     free(source);
     return 1;

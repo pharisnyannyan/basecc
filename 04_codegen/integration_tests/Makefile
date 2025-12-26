@@ -38,6 +38,18 @@ LOOP_CONTROL_EXPECTED := loop_control_driver_expected.txt
 PRIMES_LL := ../build/codegen_primes.ll
 PRIMES_INPUT := testdata/primes.c
 PRIMES_EXPECTED := primes_driver_expected.txt
+BST_LL := ../build/codegen_bst.ll
+BST_INPUT := testdata/bst.c
+BST_EXPECTED := bst_driver_expected.txt
+SIEVE_LL := ../build/codegen_sieve_primes.ll
+SIEVE_INPUT := testdata/sieve_primes.c
+SIEVE_EXPECTED := sieve_primes_driver_expected.txt
+GCD_LL := ../build/codegen_gcd_recursive.ll
+GCD_INPUT := testdata/gcd_recursive.c
+GCD_EXPECTED := gcd_recursive_driver_expected.txt
+CONV_LL := ../build/codegen_conv1d.ll
+CONV_INPUT := testdata/conv1d.c
+CONV_EXPECTED := conv1d_driver_expected.txt
 STRUCT_LL := ../build/codegen_struct_basic.ll
 STRUCT_INPUT := testdata/struct_basic.c
 STRUCT_EXPECTED := struct_basic_driver_expected.txt
@@ -96,6 +108,22 @@ PRIMES_OBJ := $(BUILD_DIR)/primes.o
 PRIMES_BIN := $(BUILD_DIR)/primes_driver
 PRIMES_DRIVER := primes_driver.c
 PRIMES_OUTPUT := $(BUILD_DIR)/primes_output.txt
+BST_OBJ := $(BUILD_DIR)/bst.o
+BST_BIN := $(BUILD_DIR)/bst_driver
+BST_DRIVER := bst_driver.c
+BST_OUTPUT := $(BUILD_DIR)/bst_output.txt
+SIEVE_OBJ := $(BUILD_DIR)/sieve_primes.o
+SIEVE_BIN := $(BUILD_DIR)/sieve_primes_driver
+SIEVE_DRIVER := sieve_primes_driver.c
+SIEVE_OUTPUT := $(BUILD_DIR)/sieve_primes_output.txt
+GCD_OBJ := $(BUILD_DIR)/gcd_recursive.o
+GCD_BIN := $(BUILD_DIR)/gcd_recursive_driver
+GCD_DRIVER := gcd_recursive_driver.c
+GCD_OUTPUT := $(BUILD_DIR)/gcd_recursive_output.txt
+CONV_OBJ := $(BUILD_DIR)/conv1d.o
+CONV_BIN := $(BUILD_DIR)/conv1d_driver
+CONV_DRIVER := conv1d_driver.c
+CONV_OUTPUT := $(BUILD_DIR)/conv1d_output.txt
 STRUCT_OBJ := $(BUILD_DIR)/struct_basic.o
 STRUCT_BIN := $(BUILD_DIR)/struct_basic_driver
 STRUCT_DRIVER := struct_basic_driver.c
@@ -110,11 +138,13 @@ STRUCT_LIST_OUTPUT := $(BUILD_DIR)/struct_linked_list_output.txt
 all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) \
 	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN) $(HEAP_SORT_BIN) \
 	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN) \
+	$(BST_BIN) $(SIEVE_BIN) $(GCD_BIN) $(CONV_BIN) \
 	$(STRUCT_BIN) $(STRUCT_LIST_BIN)
 
 generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) \
 	$(QUICK_SORT_LL) $(MERGE_SORT_LL) $(HEAP_SORT_LL) \
 	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL) \
+	$(BST_LL) $(SIEVE_LL) $(GCD_LL) $(CONV_LL) \
 	$(STRUCT_LL) $(STRUCT_LIST_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
@@ -150,6 +180,18 @@ $(LOOP_CONTROL_LL): $(CODEGEN_BIN) $(LOOP_CONTROL_INPUT)
 $(PRIMES_LL): $(CODEGEN_BIN) $(PRIMES_INPUT)
 	./$(CODEGEN_BIN) $(PRIMES_INPUT) $(PRIMES_LL)
 
+$(BST_LL): $(CODEGEN_BIN) $(BST_INPUT)
+	./$(CODEGEN_BIN) $(BST_INPUT) $(BST_LL)
+
+$(SIEVE_LL): $(CODEGEN_BIN) $(SIEVE_INPUT)
+	./$(CODEGEN_BIN) $(SIEVE_INPUT) $(SIEVE_LL)
+
+$(GCD_LL): $(CODEGEN_BIN) $(GCD_INPUT)
+	./$(CODEGEN_BIN) $(GCD_INPUT) $(GCD_LL)
+
+$(CONV_LL): $(CODEGEN_BIN) $(CONV_INPUT)
+	./$(CODEGEN_BIN) $(CONV_INPUT) $(CONV_LL)
+
 $(STRUCT_LL): $(CODEGEN_BIN) $(STRUCT_INPUT)
 	./$(CODEGEN_BIN) $(STRUCT_INPUT) $(STRUCT_LL)
 
@@ -159,12 +201,14 @@ $(STRUCT_LIST_LL): $(CODEGEN_BIN) $(STRUCT_LIST_INPUT)
 compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ) \
 	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ) $(HEAP_SORT_OBJ) \
 	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ) \
+	$(BST_OBJ) $(SIEVE_OBJ) $(GCD_OBJ) $(CONV_OBJ) \
 	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
 	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT) $(MERGE_SORT_OUTPUT) \
 	$(HEAP_SORT_OUTPUT) $(REVERSE_STRING_OUTPUT) $(LOOP_CONTROL_OUTPUT) \
-	$(PRIMES_OUTPUT) $(STRUCT_OUTPUT) $(STRUCT_LIST_OUTPUT)
+	$(PRIMES_OUTPUT) $(BST_OUTPUT) $(SIEVE_OUTPUT) $(GCD_OUTPUT) \
+	$(CONV_OUTPUT) $(STRUCT_OUTPUT) $(STRUCT_LIST_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
@@ -178,6 +222,10 @@ verify: run
 	cmp -s $(REVERSE_STRING_OUTPUT) $(REVERSE_STRING_EXPECTED)
 	cmp -s $(LOOP_CONTROL_OUTPUT) $(LOOP_CONTROL_EXPECTED)
 	cmp -s $(PRIMES_OUTPUT) $(PRIMES_EXPECTED)
+	cmp -s $(BST_OUTPUT) $(BST_EXPECTED)
+	cmp -s $(SIEVE_OUTPUT) $(SIEVE_EXPECTED)
+	cmp -s $(GCD_OUTPUT) $(GCD_EXPECTED)
+	cmp -s $(CONV_OUTPUT) $(CONV_EXPECTED)
 	cmp -s $(STRUCT_OUTPUT) $(STRUCT_EXPECTED)
 	cmp -s $(STRUCT_LIST_OUTPUT) $(STRUCT_LIST_EXPECTED)
 
@@ -221,6 +269,18 @@ $(LOOP_CONTROL_OBJ): $(LOOP_CONTROL_LL) | $(BUILD_DIR)
 
 $(PRIMES_OBJ): $(PRIMES_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(PRIMES_LL) -o $(PRIMES_OBJ)
+
+$(BST_OBJ): $(BST_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(BST_LL) -o $(BST_OBJ)
+
+$(SIEVE_OBJ): $(SIEVE_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(SIEVE_LL) -o $(SIEVE_OBJ)
+
+$(GCD_OBJ): $(GCD_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(GCD_LL) -o $(GCD_OBJ)
+
+$(CONV_OBJ): $(CONV_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(CONV_LL) -o $(CONV_OBJ)
 
 $(STRUCT_OBJ): $(STRUCT_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(STRUCT_LL) -o $(STRUCT_OBJ)
@@ -266,6 +326,18 @@ $(LOOP_CONTROL_BIN): $(LOOP_CONTROL_OBJ) $(LOOP_CONTROL_DRIVER)
 $(PRIMES_BIN): $(PRIMES_OBJ) $(PRIMES_DRIVER)
 	$(CC) $(CFLAGS) -o $(PRIMES_BIN) $(PRIMES_DRIVER) $(PRIMES_OBJ)
 
+$(BST_BIN): $(BST_OBJ) $(BST_DRIVER)
+	$(CC) $(CFLAGS) -o $(BST_BIN) $(BST_DRIVER) $(BST_OBJ)
+
+$(SIEVE_BIN): $(SIEVE_OBJ) $(SIEVE_DRIVER)
+	$(CC) $(CFLAGS) -o $(SIEVE_BIN) $(SIEVE_DRIVER) $(SIEVE_OBJ)
+
+$(GCD_BIN): $(GCD_OBJ) $(GCD_DRIVER)
+	$(CC) $(CFLAGS) -o $(GCD_BIN) $(GCD_DRIVER) $(GCD_OBJ)
+
+$(CONV_BIN): $(CONV_OBJ) $(CONV_DRIVER)
+	$(CC) $(CFLAGS) -o $(CONV_BIN) $(CONV_DRIVER) $(CONV_OBJ)
+
 $(STRUCT_BIN): $(STRUCT_OBJ) $(STRUCT_DRIVER)
 	$(CC) $(CFLAGS) -o $(STRUCT_BIN) $(STRUCT_DRIVER) $(STRUCT_OBJ)
 
@@ -305,6 +377,18 @@ $(LOOP_CONTROL_OUTPUT): $(LOOP_CONTROL_BIN)
 
 $(PRIMES_OUTPUT): $(PRIMES_BIN)
 	./$(PRIMES_BIN) > $(PRIMES_OUTPUT)
+
+$(BST_OUTPUT): $(BST_BIN)
+	./$(BST_BIN) > $(BST_OUTPUT)
+
+$(SIEVE_OUTPUT): $(SIEVE_BIN)
+	./$(SIEVE_BIN) > $(SIEVE_OUTPUT)
+
+$(GCD_OUTPUT): $(GCD_BIN)
+	./$(GCD_BIN) > $(GCD_OUTPUT)
+
+$(CONV_OUTPUT): $(CONV_BIN)
+	./$(CONV_BIN) > $(CONV_OUTPUT)
 
 $(STRUCT_OUTPUT): $(STRUCT_BIN)
 	./$(STRUCT_BIN) > $(STRUCT_OUTPUT)

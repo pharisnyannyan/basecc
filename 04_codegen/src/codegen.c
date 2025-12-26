@@ -143,6 +143,66 @@ static int codegen_type_is_integer(TypeDesc desc)
     return desc.pointer_depth == 0;
 }
 
+static int codegen_integer_width(TypeDesc desc)
+{
+    Token token;
+    TypeInfo info;
+
+    if (!codegen_type_is_integer(desc)) {
+        return 0;
+    }
+
+    token.type = desc.base_token;
+    token.start = NULL;
+    token.length = 0;
+    token.value = 0;
+    info = codegen_type_info(token);
+    return info.width;
+}
+
+static int codegen_emit_integer_cast(FunctionContext *ctx,
+    TypeDesc from,
+    TypeDesc to,
+    char *value,
+    size_t value_size)
+{
+    int from_width = codegen_integer_width(from);
+    int to_width = codegen_integer_width(to);
+    char from_type[32];
+    char to_type[32];
+    char cast_value[32];
+
+    if (from_width == 0 || to_width == 0) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected integer cast");
+    }
+
+    if (from_width == to_width) {
+        return 1;
+    }
+
+    codegen_format_desc_type(from, from_type, sizeof(from_type));
+    codegen_format_desc_type(to, to_type, sizeof(to_type));
+    snprintf(cast_value, sizeof(cast_value), "%%t%d", ctx->next_temp_id++);
+
+    if (from_width > to_width) {
+        fprintf(ctx->out, "  %s = trunc %s %s to %s\n",
+            cast_value,
+            from_type,
+            value,
+            to_type);
+    } else {
+        fprintf(ctx->out, "  %s = sext %s %s to %s\n",
+            cast_value,
+            from_type,
+            value,
+            to_type);
+    }
+
+    snprintf(value, value_size, "%s", cast_value);
+    return 1;
+}
+
 static int codegen_name_matches(Token token, const char *name, size_t length)
 {
     if (token.length != length) {
@@ -581,7 +641,6 @@ static int codegen_emit_expression(FunctionContext *ctx,
         for (index = 0; index < arg_count; index++) {
             TypeDesc arg_type;
             TypeDesc param_type;
-            TypeInfo param_info;
 
             if (!arg || !param) {
                 free(arg_values);
@@ -622,18 +681,13 @@ static int codegen_emit_expression(FunctionContext *ctx,
             codegen_format_type(param->type_token, param->pointer_depth,
                 arg_types[index], sizeof(arg_types[index]));
 
-            param_info = codegen_type_info(param->type_token);
-            if (param_type.pointer_depth == 0 && param_info.width < 32) {
-                char cast_value[32];
-
-                snprintf(cast_value, sizeof(cast_value), "%%t%d",
-                    ctx->next_temp_id++);
-                fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-                    cast_value,
-                    arg_values[index],
-                    arg_types[index]);
-                snprintf(arg_values[index], sizeof(arg_values[index]), "%s",
-                    cast_value);
+            if (param_type.pointer_depth == 0) {
+                if (!codegen_emit_integer_cast(ctx, arg_type, param_type,
+                        arg_values[index], sizeof(arg_values[index]))) {
+                    free(arg_values);
+                    free(arg_types);
+                    return 0;
+                }
             }
 
             arg = arg->next;
@@ -1048,22 +1102,17 @@ static int codegen_emit_local_declaration(FunctionContext *ctx,
                 "codegen: initializer type mismatch");
         }
     } else {
-        TypeInfo init_info = codegen_type_info(node->type_token);
+        TypeDesc target_type;
+
         if (!codegen_type_is_integer(init_type)) {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected integer initializer");
         }
 
-        if (init_info.width < 32) {
-            char cast_value[32];
-
-            snprintf(cast_value, sizeof(cast_value), "%%t%d",
-                ctx->next_temp_id++);
-            fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-                cast_value,
-                init_value,
-                type_name);
-            snprintf(init_value, sizeof(init_value), "%s", cast_value);
+        target_type = codegen_make_type_desc(node->type_token, 0);
+        if (!codegen_emit_integer_cast(ctx, init_type, target_type,
+                init_value, sizeof(init_value))) {
+            return 0;
         }
     }
 
@@ -1349,7 +1398,6 @@ static int codegen_emit_for(FunctionContext *ctx, const ParserNode *node)
 static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
 {
     char value[32];
-    char cast_value[32];
     TypeDesc expr_type;
 
     switch (node->type) {
@@ -1383,8 +1431,6 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             char pointer_value[32];
             TypeDesc pointer_type;
             TypeDesc target_type;
-            TypeInfo info;
-            Token target_token;
 
             if (!operand || operand->next) {
                 return codegen_set_error(ctx->codegen,
@@ -1423,21 +1469,9 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                         "codegen: expected integer assignment");
                 }
 
-                target_token.type = target_type.base_token;
-                target_token.start = NULL;
-                target_token.length = 0;
-                target_token.value = 0;
-                info = codegen_type_info(target_token);
-                if (info.width < 32) {
-                    char cast_value[32];
-
-                    snprintf(cast_value, sizeof(cast_value), "%%t%d",
-                        ctx->next_temp_id++);
-                    fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-                        cast_value,
-                        value,
-                        type_name);
-                    snprintf(value, sizeof(value), "%s", cast_value);
+                if (!codegen_emit_integer_cast(ctx, expr_type, target_type,
+                        value, sizeof(value))) {
+                    return 0;
                 }
             }
 
@@ -1471,22 +1505,19 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                         "codegen: assignment type mismatch");
                 }
             } else {
-                TypeInfo info = codegen_type_info(local->type_token);
                 if (!codegen_type_is_integer(expr_type)) {
                     return codegen_set_error(ctx->codegen,
                         "codegen: expected integer assignment");
                 }
 
-                if (info.width < 32) {
-                    char cast_value[32];
+                {
+                    TypeDesc target_type;
 
-                    snprintf(cast_value, sizeof(cast_value), "%%t%d",
-                        ctx->next_temp_id++);
-                    fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-                        cast_value,
-                        value,
-                        type_name);
-                    snprintf(value, sizeof(value), "%s", cast_value);
+                    target_type = codegen_make_type_desc(local->type_token, 0);
+                    if (!codegen_emit_integer_cast(ctx, expr_type, target_type,
+                            value, sizeof(value))) {
+                        return 0;
+                    }
                 }
             }
 
@@ -1520,22 +1551,19 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                     "codegen: assignment type mismatch");
             }
         } else {
-            TypeInfo info = codegen_type_info(global->type_token);
             if (!codegen_type_is_integer(expr_type)) {
                 return codegen_set_error(ctx->codegen,
                     "codegen: expected integer assignment");
             }
 
-            if (info.width < 32) {
-                char cast_value[32];
+            {
+                TypeDesc target_type;
 
-                snprintf(cast_value, sizeof(cast_value), "%%t%d",
-                    ctx->next_temp_id++);
-                fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-                    cast_value,
-                    value,
-                    type_name);
-                snprintf(value, sizeof(value), "%s", cast_value);
+                target_type = codegen_make_type_desc(global->type_token, 0);
+                if (!codegen_emit_integer_cast(ctx, expr_type, target_type,
+                        value, sizeof(value))) {
+                    return 0;
+                }
             }
         }
 
@@ -1578,17 +1606,18 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                 "codegen: expected integer return");
         }
 
-        if (ctx->return_width == 32) {
-            fprintf(ctx->out, "  ret i32 %s\n", value);
-            return 1;
+        {
+            TypeDesc return_type;
+
+            return_type.base_token = ctx->return_base_token;
+            return_type.pointer_depth = 0;
+            if (!codegen_emit_integer_cast(ctx, expr_type, return_type,
+                    value, sizeof(value))) {
+                return 0;
+            }
         }
 
-        snprintf(cast_value, sizeof(cast_value), "%%t%d", ctx->next_temp_id++);
-        fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
-            cast_value,
-            value,
-            ctx->return_type);
-        fprintf(ctx->out, "  ret %s %s\n", ctx->return_type, cast_value);
+        fprintf(ctx->out, "  ret %s %s\n", ctx->return_type, value);
         return 1;
     case PARSER_NODE_EMPTY:
         if (node->first_child) {

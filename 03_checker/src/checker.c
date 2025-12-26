@@ -145,6 +145,27 @@ static int checker_validate_expression(Checker *checker,
         return checker_validate_expression(checker, base);
     }
 
+    if (node->type == PARSER_NODE_INDEX) {
+        const ParserNode *base = node->first_child;
+        const ParserNode *index = base ? base->next : NULL;
+
+        if (!base || !index || index->next) {
+            return checker_set_error(checker,
+                "checker: expected index operands");
+        }
+
+        if (!token_is_punct(node->token, "[")) {
+            return checker_set_error(checker,
+                "checker: expected index operator");
+        }
+
+        if (!checker_validate_expression(checker, base)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, index);
+    }
+
     if (node->type == PARSER_NODE_UNARY) {
         const ParserNode *operand = node->first_child;
 
@@ -258,6 +279,14 @@ static int checker_validate_assignment(Checker *checker,
     }
 
     if (left->type == PARSER_NODE_MEMBER) {
+        if (!checker_validate_expression(checker, left)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, right);
+    }
+
+    if (left->type == PARSER_NODE_INDEX) {
         if (!checker_validate_expression(checker, left)) {
             return 0;
         }

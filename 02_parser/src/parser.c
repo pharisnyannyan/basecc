@@ -44,6 +44,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
     node->type_token = token;
     node->pointer_depth = 0;
     node->is_const = 0;
+    node->array_length = 0;
     node->first_child = NULL;
     node->next = NULL;
 }
@@ -429,39 +430,79 @@ static ParserNode *parser_parse_postfix(Parser *parser)
         return node;
     }
 
-    while (token_is_punct(parser->last_token, ".")
-        || token_is_punct(parser->last_token, "->")) {
-        Token op_token = parser->last_token;
-        Token field_token;
-        ParserNode *field = NULL;
-        ParserNode *member = NULL;
+    while (1) {
+        if (token_is_punct(parser->last_token, "[")) {
+            Token op_token = parser->last_token;
+            ParserNode *index_expr = NULL;
+            ParserNode *index = NULL;
 
-        parser_next(parser);
-        field_token = parser->last_token;
-        if (field_token.type != TOKEN_IDENT) {
-            ParserNode *error_node = parser_make_error(parser, field_token,
-                "parser: expected field identifier");
-            parser_free_node(node);
-            return error_node;
+            parser_next(parser);
+            index_expr = parser_parse_expression(parser);
+            if (!index_expr || index_expr->type == PARSER_NODE_INVALID) {
+                parser_free_node(node);
+                return index_expr;
+            }
+
+            if (!parser_match_punct(parser, "]")) {
+                ParserNode *error_node = parser_make_error(parser,
+                    parser->last_token,
+                    "parser: expected ']'");
+                parser_free_node(node);
+                parser_free_node(index_expr);
+                return error_node;
+            }
+
+            index = parser_alloc_node(parser, PARSER_NODE_INDEX, op_token);
+            if (!index) {
+                parser_free_node(node);
+                parser_free_node(index_expr);
+                return NULL;
+            }
+
+            index->first_child = node;
+            node->next = index_expr;
+            node = index;
+            continue;
         }
 
-        parser_next(parser);
-        field = parser_alloc_node(parser, PARSER_NODE_IDENTIFIER, field_token);
-        if (!field) {
-            parser_free_node(node);
-            return NULL;
+        if (token_is_punct(parser->last_token, ".")
+            || token_is_punct(parser->last_token, "->")) {
+            Token op_token = parser->last_token;
+            Token field_token;
+            ParserNode *field = NULL;
+            ParserNode *member = NULL;
+
+            parser_next(parser);
+            field_token = parser->last_token;
+            if (field_token.type != TOKEN_IDENT) {
+                ParserNode *error_node = parser_make_error(parser, field_token,
+                    "parser: expected field identifier");
+                parser_free_node(node);
+                return error_node;
+            }
+
+            parser_next(parser);
+            field = parser_alloc_node(parser, PARSER_NODE_IDENTIFIER,
+                field_token);
+            if (!field) {
+                parser_free_node(node);
+                return NULL;
+            }
+
+            member = parser_alloc_node(parser, PARSER_NODE_MEMBER, op_token);
+            if (!member) {
+                parser_free_node(node);
+                parser_free_node(field);
+                return NULL;
+            }
+
+            member->first_child = node;
+            node->next = field;
+            node = member;
+            continue;
         }
 
-        member = parser_alloc_node(parser, PARSER_NODE_MEMBER, op_token);
-        if (!member) {
-            parser_free_node(node);
-            parser_free_node(field);
-            return NULL;
-        }
-
-        member->first_child = node;
-        node->next = field;
-        node = member;
+        break;
     }
 
     return node;
@@ -1142,6 +1183,29 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
 
     node->type_token = type_token;
 
+    if (parser_match_punct(parser, "[")) {
+        Token length_token = parser->last_token;
+
+        if (length_token.type != TOKEN_NUMBER || length_token.value <= 0) {
+            ParserNode *error_node = parser_make_error(parser, length_token,
+                "parser: expected array size");
+            parser_free_node(node);
+            return error_node;
+        }
+
+        parser_next(parser);
+
+        if (!parser_match_punct(parser, "]")) {
+            ParserNode *error_node = parser_make_error(parser,
+                parser->last_token,
+                "parser: expected ']'");
+            parser_free_node(node);
+            return error_node;
+        }
+
+        node->array_length = (size_t)length_token.value;
+    }
+
     if (parser_match_punct(parser, "=")) {
         ParserNode *init = parser_parse_expression(parser);
 
@@ -1418,6 +1482,24 @@ static ParserNode *parser_parse_parameter(Parser *parser)
     }
 
     parser_next(parser);
+
+    if (parser_match_punct(parser, "[")) {
+        Token length_token = parser->last_token;
+
+        if (length_token.type != TOKEN_NUMBER || length_token.value <= 0) {
+            return parser_make_error(parser, length_token,
+                "parser: expected array size");
+        }
+
+        parser_next(parser);
+
+        if (!parser_match_punct(parser, "]")) {
+            return parser_make_error(parser, parser->last_token,
+                "parser: expected ']'");
+        }
+
+        spec.pointer_depth += 1;
+    }
 
     node = parser_alloc_node(parser, PARSER_NODE_DECLARATION, token);
     if (!node) {

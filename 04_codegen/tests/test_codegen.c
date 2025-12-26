@@ -12,6 +12,7 @@
     X(generate_type_declarations, "generate type declarations") \
     X(generate_defaults, "generate default initializers") \
     X(generate_pointer_globals, "generate pointer globals") \
+    X(generate_array_ops, "generate array operations") \
     X(generate_pointer_return, "generate pointer return") \
     X(generate_typedef_casts, "generate typedef casts") \
     X(generate_struct_definitions, "generate struct definitions") \
@@ -211,6 +212,17 @@ TEST(generate_pointer_globals, "generate pointer globals")
         "codegen_pointers",
         "tests/testdata/pointer_globals.c",
         "tests/testdata/pointer_globals.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_array_ops, "generate array operations")
+{
+    CodegenFixture fixture = {
+        "codegen_array_ops",
+        "tests/testdata/array_ops.c",
+        "tests/testdata/array_ops.ll"
     };
 
     return run_codegen_fixture(&fixture);

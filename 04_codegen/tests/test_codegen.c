@@ -19,6 +19,7 @@
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_loop_control, "generate loop control") \
     X(generate_function_call, "generate function call") \
+    X(generate_extern_calls, "generate extern calls") \
     X(generate_arithmetic_function, "generate arithmetic function") \
     X(generate_logical_function, "generate logical operators") \
     X(generate_sizeof, "generate sizeof expressions") \
@@ -291,6 +292,17 @@ TEST(generate_function_call, "generate function call")
         "codegen_function_call",
         "tests/testdata/function_call.c",
         "tests/testdata/function_call.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_extern_calls, "generate extern calls")
+{
+    CodegenFixture fixture = {
+        "codegen_extern_calls",
+        "tests/testdata/extern_calls.c",
+        "tests/testdata/extern_calls.ll"
     };
 
     return run_codegen_fixture(&fixture);

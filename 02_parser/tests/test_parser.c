@@ -16,6 +16,7 @@
     X(parse_for_loop, "parse for loop") \
     X(parse_loop_control, "parse loop control") \
     X(parse_function_call, "parse function call") \
+    X(parse_extern_function_declaration, "parse extern function declaration") \
     X(parse_assignment_statement, "parse assignment statement") \
     X(parse_dereference_assignment, "parse dereference assignment") \
     X(parse_binary_expression, "parse binary expression") \
@@ -491,6 +492,48 @@ TEST(parse_function_call, "parse function call")
     ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
         ->first_child->next->type == PARSER_NODE_NUMBER,
         "expected second argument");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_extern_function_declaration, "parse extern function declaration")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "extern int write(int fd, const char *buf, int count);"
+        "int main(){return 0;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit");
+    ASSERT_TRUE(node->first_child != NULL, "expected extern function");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    ASSERT_TRUE(node->first_child->is_extern, "expected extern function");
+    ASSERT_TRUE(token_equals(node->first_child->token, "write"),
+        "expected extern function name");
+
+    ParserNode *param = node->first_child->first_child;
+    ASSERT_TRUE(param != NULL, "expected parameter list");
+    ASSERT_TRUE(param->type == PARSER_NODE_DECLARATION,
+        "expected parameter declaration");
+    ASSERT_TRUE(token_equals(param->token, "fd"),
+        "expected first parameter name");
+
+    param = param->next;
+    ASSERT_TRUE(param != NULL, "expected second parameter");
+    ASSERT_TRUE(token_equals(param->token, "buf"),
+        "expected second parameter name");
+
+    param = param->next;
+    ASSERT_TRUE(param != NULL, "expected third parameter");
+    ASSERT_TRUE(token_equals(param->token, "count"),
+        "expected third parameter name");
+    ASSERT_TRUE(param->next == NULL, "expected no function body");
 
     parser_free_node(node);
     return 1;

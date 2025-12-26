@@ -547,11 +547,14 @@ static int checker_validate_function(Checker *checker, const ParserNode *node)
     }
 
     if (!node->first_child) {
+        if (node->is_extern) {
+            return 1;
+        }
         return checker_set_error(checker, "checker: expected function body");
     }
 
     for (child = node->first_child; child; child = child->next) {
-        if (!child->next) {
+        if (!child->next && child->type == PARSER_NODE_BLOCK) {
             body = child;
             break;
         }
@@ -573,6 +576,9 @@ static int checker_validate_function(Checker *checker, const ParserNode *node)
     }
 
     if (!body) {
+        if (node->is_extern) {
+            return 1;
+        }
         return checker_set_error(checker, "checker: expected function body");
     }
 

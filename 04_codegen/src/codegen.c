@@ -1185,12 +1185,18 @@ static int codegen_function_parts(Codegen *codegen, const ParserNode *node,
     size_t param_count = 0;
 
     if (!node->first_child) {
+        if (node->is_extern) {
+            *param_list_out = NULL;
+            *param_count_out = 0;
+            *body_out = NULL;
+            return 1;
+        }
         return codegen_set_error(codegen,
             "codegen: expected function body");
     }
 
     for (child = node->first_child; child; child = child->next) {
-        if (!child->next) {
+        if (!child->next && child->type == PARSER_NODE_BLOCK) {
             body = child;
             break;
         }
@@ -1208,6 +1214,12 @@ static int codegen_function_parts(Codegen *codegen, const ParserNode *node,
     }
 
     if (!body || body->type != PARSER_NODE_BLOCK) {
+        if (node->is_extern && !body) {
+            *param_list_out = param_count ? param_list : NULL;
+            *param_count_out = param_count;
+            *body_out = NULL;
+            return 1;
+        }
         return codegen_set_error(codegen,
             "codegen: expected function block");
     }
@@ -3672,6 +3684,99 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     return 1;
 }
 
+static int codegen_emit_function_declaration(Codegen *codegen,
+    const ParserNode *node,
+    const StructSymbol *structs, size_t struct_count,
+    const TypedefSymbol *typedefs, size_t typedef_count,
+    FILE *out)
+{
+    const ParserNode *param_list = NULL;
+    const ParserNode *body = NULL;
+    const ParserNode *param = NULL;
+    size_t param_count = 0;
+    size_t index = 0;
+    char return_type[32];
+    char param_type[32];
+    TypeDesc return_desc;
+    TypeDesc resolved_return;
+
+    if (node->type != PARSER_NODE_FUNCTION) {
+        return codegen_set_error(codegen,
+            "codegen: expected function");
+    }
+
+    if (node->token.type != TOKEN_IDENT) {
+        return codegen_set_error(codegen,
+            "codegen: expected identifier token");
+    }
+
+    if (!codegen_function_parts(codegen, node, &param_list, &param_count,
+            &body)) {
+        return 0;
+    }
+
+    if (body) {
+        return codegen_set_error(codegen,
+            "codegen: unexpected function body");
+    }
+
+    return_desc = codegen_make_type_desc(node->type_token,
+        node->pointer_depth, node->is_const);
+    if (!codegen_require_type(codegen, structs, struct_count, typedefs,
+            typedef_count, return_desc, &resolved_return)) {
+        return 0;
+    }
+
+    if (resolved_return.pointer_depth == 0
+        && resolved_return.type_token.type == TOKEN_STRUCT) {
+        return codegen_set_error(codegen,
+            "codegen: struct return not supported");
+    }
+
+    codegen_format_desc_type(resolved_return, return_type,
+        sizeof(return_type));
+
+    fprintf(out, "declare %s @%.*s(",
+        return_type,
+        (int)node->token.length,
+        node->token.start);
+
+    param = param_list;
+    for (index = 0; index < param_count; index++) {
+        TypeDesc param_desc;
+
+        if (index > 0) {
+            fprintf(out, ", ");
+        }
+
+        if (!param) {
+            return codegen_set_error(codegen,
+                "codegen: expected parameter");
+        }
+
+        param_desc = codegen_make_type_desc(param->type_token,
+            param->pointer_depth, param->is_const);
+        if (!codegen_require_type(codegen, structs, struct_count, typedefs,
+                typedef_count, param_desc, &param_desc)) {
+            return 0;
+        }
+
+        if (param_desc.pointer_depth == 0
+            && param_desc.type_token.type == TOKEN_STRUCT) {
+            return codegen_set_error(codegen,
+                "codegen: struct parameter not supported");
+        }
+
+        codegen_format_desc_type(param_desc, param_type,
+            sizeof(param_type));
+        fprintf(out, "%s", param_type);
+        param = param->next;
+    }
+
+    fprintf(out, ")\n");
+    return 1;
+}
+
 static int codegen_emit_translation_unit(Codegen *codegen,
     const ParserNode *node,
     FILE *out)
@@ -3849,6 +3954,26 @@ static int codegen_emit_translation_unit(Codegen *codegen,
     }
 
     for (child = node->first_child; child; child = child->next) {
+        if (child->type == PARSER_NODE_FUNCTION) {
+            const ParserNode *param_list = NULL;
+            const ParserNode *body = NULL;
+            size_t param_count = 0;
+
+            if (!codegen_function_parts(codegen, child, &param_list,
+                    &param_count, &body)) {
+                goto cleanup;
+            }
+
+            if (child->is_extern && !body) {
+                if (!codegen_emit_function_declaration(codegen, child,
+                        structs, struct_count, typedefs, typedef_count, out)) {
+                    goto cleanup;
+                }
+            }
+        }
+    }
+
+    for (child = node->first_child; child; child = child->next) {
         if (child->type == PARSER_NODE_DECLARATION) {
             if (!codegen_emit_declaration(codegen, child, globals,
                 global_count, structs, struct_count, typedefs, typedef_count,
@@ -3859,6 +3984,19 @@ static int codegen_emit_translation_unit(Codegen *codegen,
         }
 
         if (child->type == PARSER_NODE_FUNCTION) {
+            const ParserNode *param_list = NULL;
+            const ParserNode *body = NULL;
+            size_t param_count = 0;
+
+            if (!codegen_function_parts(codegen, child, &param_list,
+                    &param_count, &body)) {
+                goto cleanup;
+            }
+
+            if (child->is_extern && !body) {
+                continue;
+            }
+
             if (!codegen_emit_function(codegen, child, globals, global_count,
                 structs, struct_count, typedefs, typedef_count, functions,
                 function_count, out)) {

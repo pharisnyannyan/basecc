@@ -14,6 +14,8 @@ typedef enum TokenType {
     TOKEN_FOR,
     TOKEN_SWITCH,
     TOKEN_CASE,
+    TOKEN_BREAK,
+    TOKEN_CONTINUE,
     TOKEN_RETURN,
     TOKEN_CHAR,
     TOKEN_SHORT,

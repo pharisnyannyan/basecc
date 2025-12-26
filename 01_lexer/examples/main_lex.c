@@ -19,10 +19,18 @@ static const char *token_type_name(TokenType type)
         return "TOKEN_ELSE";
     case TOKEN_WHILE:
         return "TOKEN_WHILE";
+    case TOKEN_FOR:
+        return "TOKEN_FOR";
     case TOKEN_SWITCH:
         return "TOKEN_SWITCH";
     case TOKEN_CASE:
         return "TOKEN_CASE";
+    case TOKEN_BREAK:
+        return "TOKEN_BREAK";
+    case TOKEN_CONTINUE:
+        return "TOKEN_CONTINUE";
+    case TOKEN_RETURN:
+        return "TOKEN_RETURN";
     case TOKEN_INT:
         return "TOKEN_INT";
     case TOKEN_CHAR:

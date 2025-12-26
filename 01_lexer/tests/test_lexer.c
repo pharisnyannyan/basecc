@@ -251,7 +251,8 @@ TEST(keywords, "keywords")
 {
     Lexer lexer;
     Token token;
-    lexer_init(&lexer, "if else while for switch case return char short int iffy");
+    lexer_init(&lexer,
+        "if else while for switch case break continue return char short int iffy");
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_IF, "if");
@@ -270,6 +271,12 @@ TEST(keywords, "keywords")
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_CASE, "case");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_BREAK, "break");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_CONTINUE, "continue");
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_RETURN, "return");
@@ -303,8 +310,8 @@ TEST(keyword_snippets, "keyword snippets")
         "int classify(int x){\n"
         "if(x==0){return 0;}else{return 1;}\n"
         "}\n"
-        "int loop(int n){while(n!=0){n=n-1;}return n;}\n"
-        "int tally(int n){for(n=n;n;n=n-1){;}return n;}\n"
+        "int loop(int n){while(n!=0){n=n-1;break;}return n;}\n"
+        "int tally(int n){for(n=n;n;n=n-1){continue;}return n;}\n"
         "int sw(int v){switch(v){case 0:return 0;case 1:return 1;}}");
 
     token = lexer_next(&lexer);
@@ -453,6 +460,12 @@ TEST(keyword_snippets, "keyword snippets")
     ASSERT_PUNCT_TOKEN(token, ";");
 
     token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_BREAK, "break");
+
+    token = lexer_next(&lexer);
+    ASSERT_PUNCT_TOKEN(token, ";");
+
+    token = lexer_next(&lexer);
     ASSERT_PUNCT_TOKEN(token, "}");
 
     token = lexer_next(&lexer);
@@ -538,6 +551,9 @@ TEST(keyword_snippets, "keyword snippets")
 
     token = lexer_next(&lexer);
     ASSERT_PUNCT_TOKEN(token, "{");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_CONTINUE, "continue");
 
     token = lexer_next(&lexer);
     ASSERT_PUNCT_TOKEN(token, ";");

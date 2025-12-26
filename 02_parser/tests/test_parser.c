@@ -11,6 +11,7 @@
     X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_for_loop, "parse for loop") \
+    X(parse_loop_control, "parse loop control") \
     X(parse_function_call, "parse function call") \
     X(parse_assignment_statement, "parse assignment statement") \
     X(parse_dereference_assignment, "parse dereference assignment") \
@@ -204,6 +205,68 @@ TEST(parse_for_loop, "parse for loop")
     ASSERT_TRUE(node->first_child->first_child->first_child->next->type
         == PARSER_NODE_FOR,
         "expected for statement");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_loop_control, "parse loop control")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "int main(){while(1){break;}for(;;){continue;}return 0;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit");
+    ASSERT_TRUE(node->first_child != NULL, "expected function");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    ASSERT_TRUE(node->first_child->first_child != NULL,
+        "expected function body");
+    ASSERT_TRUE(node->first_child->first_child->type == PARSER_NODE_BLOCK,
+        "expected function block");
+    ASSERT_TRUE(node->first_child->first_child->first_child != NULL,
+        "expected first statement");
+    ASSERT_TRUE(node->first_child->first_child->first_child->type
+        == PARSER_NODE_WHILE,
+        "expected while statement");
+    ASSERT_TRUE(node->first_child->first_child->first_child->next != NULL,
+        "expected for statement");
+    ASSERT_TRUE(node->first_child->first_child->first_child->next->type
+        == PARSER_NODE_FOR,
+        "expected for statement");
+
+    {
+        ParserNode *while_stmt = node->first_child->first_child->first_child;
+        ParserNode *while_body = while_stmt->first_child;
+        while_body = while_body ? while_body->next : NULL;
+        ASSERT_TRUE(while_body != NULL, "expected while body");
+        ASSERT_TRUE(while_body->type == PARSER_NODE_BLOCK,
+            "expected while body block");
+        ASSERT_TRUE(while_body->first_child != NULL,
+            "expected break statement");
+        ASSERT_TRUE(while_body->first_child->type == PARSER_NODE_BREAK,
+            "expected break statement");
+    }
+
+    {
+        ParserNode *for_stmt = node->first_child->first_child->first_child->next;
+        ParserNode *for_body = for_stmt->first_child;
+        for_body = for_body ? for_body->next : NULL;
+        for_body = for_body ? for_body->next : NULL;
+        for_body = for_body ? for_body->next : NULL;
+        ASSERT_TRUE(for_body != NULL, "expected for body");
+        ASSERT_TRUE(for_body->type == PARSER_NODE_BLOCK,
+            "expected for body block");
+        ASSERT_TRUE(for_body->first_child != NULL,
+            "expected continue statement");
+        ASSERT_TRUE(for_body->first_child->type == PARSER_NODE_CONTINUE,
+            "expected continue statement");
+    }
 
     parser_free_node(node);
     return 1;

@@ -15,6 +15,7 @@ void checker_init(Checker *checker, const char *input)
 {
     parser_init(&checker->parser, input);
     checker->error_message = NULL;
+    checker->loop_depth = 0;
 }
 
 static int checker_validate_declaration(Checker *checker,
@@ -239,6 +240,7 @@ static int checker_validate_statement(Checker *checker,
     case PARSER_NODE_WHILE: {
         const ParserNode *condition = node->first_child;
         const ParserNode *body = condition ? condition->next : NULL;
+        int result = 0;
 
         if (!condition || !body) {
             return checker_set_error(checker,
@@ -254,13 +256,17 @@ static int checker_validate_statement(Checker *checker,
             return 0;
         }
 
-        return checker_validate_statement(checker, body);
+        checker->loop_depth += 1;
+        result = checker_validate_statement(checker, body);
+        checker->loop_depth -= 1;
+        return result;
     }
     case PARSER_NODE_FOR: {
         const ParserNode *init = node->first_child;
         const ParserNode *condition = init ? init->next : NULL;
         const ParserNode *increment = condition ? condition->next : NULL;
         const ParserNode *body = increment ? increment->next : NULL;
+        int result = 0;
 
         if (!init || !condition || !increment || !body) {
             return checker_set_error(checker,
@@ -305,7 +311,10 @@ static int checker_validate_statement(Checker *checker,
             return 0;
         }
 
-        return checker_validate_statement(checker, body);
+        checker->loop_depth += 1;
+        result = checker_validate_statement(checker, body);
+        checker->loop_depth -= 1;
+        return result;
     }
     case PARSER_NODE_RETURN:
         if (!node->first_child || node->first_child->next) {
@@ -314,6 +323,18 @@ static int checker_validate_statement(Checker *checker,
         }
 
         return checker_validate_expression(checker, node->first_child);
+    case PARSER_NODE_BREAK:
+        if (node->first_child || checker->loop_depth <= 0) {
+            return checker_set_error(checker,
+                "checker: unexpected break statement");
+        }
+        return 1;
+    case PARSER_NODE_CONTINUE:
+        if (node->first_child || checker->loop_depth <= 0) {
+            return checker_set_error(checker,
+                "checker: unexpected continue statement");
+        }
+        return 1;
     case PARSER_NODE_EMPTY:
         if (node->first_child) {
             return checker_set_error(checker,

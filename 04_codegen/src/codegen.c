@@ -22,7 +22,15 @@ typedef struct FunctionContext {
     size_t local_capacity;
     const struct FunctionSymbol *functions;
     size_t function_count;
+    struct LoopContext *loop_stack;
+    size_t loop_depth;
+    size_t loop_capacity;
 } FunctionContext;
+
+typedef struct LoopContext {
+    char break_label[32];
+    char continue_label[32];
+} LoopContext;
 
 typedef struct TypeInfo {
     const char *ir_name;
@@ -316,6 +324,48 @@ static int codegen_set_error(Codegen *codegen, const char *message)
     }
 
     return 0;
+}
+
+static int codegen_push_loop(FunctionContext *ctx, const char *break_label,
+    const char *continue_label)
+{
+    LoopContext *loop = NULL;
+    size_t next_capacity = 0;
+
+    if (ctx->loop_depth == ctx->loop_capacity) {
+        next_capacity = ctx->loop_capacity ? ctx->loop_capacity * 2 : 4;
+        loop = realloc(ctx->loop_stack,
+            next_capacity * sizeof(*ctx->loop_stack));
+        if (!loop) {
+            return codegen_set_error(ctx->codegen, "codegen: out of memory");
+        }
+
+        ctx->loop_stack = loop;
+        ctx->loop_capacity = next_capacity;
+    }
+
+    loop = &ctx->loop_stack[ctx->loop_depth];
+    snprintf(loop->break_label, sizeof(loop->break_label), "%s", break_label);
+    snprintf(loop->continue_label, sizeof(loop->continue_label), "%s",
+        continue_label);
+    ctx->loop_depth += 1;
+    return 1;
+}
+
+static void codegen_pop_loop(FunctionContext *ctx)
+{
+    if (ctx->loop_depth > 0) {
+        ctx->loop_depth -= 1;
+    }
+}
+
+static const LoopContext *codegen_current_loop(const FunctionContext *ctx)
+{
+    if (ctx->loop_depth == 0) {
+        return NULL;
+    }
+
+    return &ctx->loop_stack[ctx->loop_depth - 1];
 }
 
 static int codegen_function_parts(Codegen *codegen, const ParserNode *node,
@@ -1295,7 +1345,11 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
         end_label);
 
     fprintf(ctx->out, "%s:\n", body_label);
+    if (!codegen_push_loop(ctx, end_label, cond_label)) {
+        return 0;
+    }
     body_terminated = codegen_emit_statement(ctx, body);
+    codegen_pop_loop(ctx);
     if (ctx->codegen->error_message) {
         return 0;
     }
@@ -1374,7 +1428,11 @@ static int codegen_emit_for(FunctionContext *ctx, const ParserNode *node)
     }
 
     fprintf(ctx->out, "%s:\n", body_label);
+    if (!codegen_push_loop(ctx, end_label, inc_label)) {
+        return 0;
+    }
     body_terminated = codegen_emit_statement(ctx, body);
+    codegen_pop_loop(ctx);
     if (ctx->codegen->error_message) {
         return 0;
     }
@@ -1579,6 +1637,28 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
         return codegen_emit_while(ctx, node);
     case PARSER_NODE_FOR:
         return codegen_emit_for(ctx, node);
+    case PARSER_NODE_BREAK: {
+        const LoopContext *loop = codegen_current_loop(ctx);
+
+        if (!loop || node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unexpected break statement");
+        }
+
+        fprintf(ctx->out, "  br label %%%s\n", loop->break_label);
+        return 1;
+    }
+    case PARSER_NODE_CONTINUE: {
+        const LoopContext *loop = codegen_current_loop(ctx);
+
+        if (!loop || node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unexpected continue statement");
+        }
+
+        fprintf(ctx->out, "  br label %%%s\n", loop->continue_label);
+        return 1;
+    }
     case PARSER_NODE_RETURN:
         if (!node->first_child || node->first_child->next) {
             return codegen_set_error(ctx->codegen,
@@ -1680,6 +1760,9 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     ctx.local_capacity = 0;
     ctx.functions = functions;
     ctx.function_count = function_count;
+    ctx.loop_stack = NULL;
+    ctx.loop_depth = 0;
+    ctx.loop_capacity = 0;
 
     fprintf(out, "define %s @%.*s(",
         ctx.return_type,
@@ -1718,6 +1801,7 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
 
     fprintf(out, "}\n");
     free(ctx.locals);
+    free(ctx.loop_stack);
     return 1;
 }
 

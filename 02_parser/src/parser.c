@@ -689,6 +689,34 @@ static ParserNode *parser_parse_return(Parser *parser)
     return node;
 }
 
+static ParserNode *parser_parse_break(Parser *parser)
+{
+    Token token = parser->last_token;
+
+    parser_next(parser);
+
+    if (!parser_match_punct(parser, ";")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected ';'");
+    }
+
+    return parser_alloc_node(parser, PARSER_NODE_BREAK, token);
+}
+
+static ParserNode *parser_parse_continue(Parser *parser)
+{
+    Token token = parser->last_token;
+
+    parser_next(parser);
+
+    if (!parser_match_punct(parser, ";")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected ';'");
+    }
+
+    return parser_alloc_node(parser, PARSER_NODE_CONTINUE, token);
+}
+
 static ParserNode *parser_parse_statement(Parser *parser)
 {
     Token token = parser->last_token;
@@ -711,6 +739,14 @@ static ParserNode *parser_parse_statement(Parser *parser)
 
     if (token.type == TOKEN_RETURN) {
         return parser_parse_return(parser);
+    }
+
+    if (token.type == TOKEN_BREAK) {
+        return parser_parse_break(parser);
+    }
+
+    if (token.type == TOKEN_CONTINUE) {
+        return parser_parse_continue(parser);
     }
 
     if (token_is_type(token)) {

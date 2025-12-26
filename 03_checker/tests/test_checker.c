@@ -10,6 +10,7 @@
     X(check_pointer_support, "check pointer support") \
     X(check_function_control_flow, "check function control flow") \
     X(check_for_loop, "check for loop") \
+    X(check_loop_control, "check loop control") \
     X(check_function_call, "check function call") \
     X(check_assignment_statement, "check assignment statement") \
     X(check_dereference_assignment, "check dereference assignment") \
@@ -18,6 +19,8 @@
     X(check_nested_parentheses, "check nested parentheses") \
     X(check_unary_arithmetic, "check unary arithmetic") \
     X(check_logical_expression, "check logical expression") \
+    X(check_break_outside_loop, "check break outside loop") \
+    X(check_continue_outside_loop, "check continue outside loop") \
     X(check_invalid_token, "check invalid token") \
     X(check_mismatched_parentheses, "check mismatched parentheses") \
     X(check_unexpected_closing_paren, "check unexpected closing paren") \
@@ -78,6 +81,19 @@ TEST(check_for_loop, "check for loop")
 
     checker_init(&checker,
         "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_loop_control, "check loop control")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){while(1){break;}for(;;){continue;}return 0;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
@@ -181,6 +197,32 @@ TEST(check_logical_expression, "check logical expression")
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_break_outside_loop, "check break outside loop")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){break;}");
+
+    ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+    ASSERT_TRUE(test_error_contains(checker_error(&checker), "break"),
+        "expected break error");
+
+    return 1;
+}
+
+TEST(check_continue_outside_loop, "check continue outside loop")
+{
+    Checker checker;
+
+    checker_init(&checker, "int main(){continue;}");
+
+    ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+    ASSERT_TRUE(test_error_contains(checker_error(&checker), "continue"),
+        "expected continue error");
 
     return 1;
 }

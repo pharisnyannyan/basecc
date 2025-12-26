@@ -111,6 +111,14 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_CASE, text, length);
     }
 
+    if (length == 5 && strncmp(text, "break", 5) == 0) {
+        return make_token(TOKEN_BREAK, text, length);
+    }
+
+    if (length == 8 && strncmp(text, "continue", 8) == 0) {
+        return make_token(TOKEN_CONTINUE, text, length);
+    }
+
     if (length == 6 && strncmp(text, "return", 6) == 0) {
         return make_token(TOKEN_RETURN, text, length);
     }

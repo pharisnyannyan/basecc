@@ -6,6 +6,7 @@
 typedef struct Checker {
     Parser parser;
     const char *error_message;
+    int loop_depth;
 } Checker;
 
 void checker_init(Checker *checker, const char *input);

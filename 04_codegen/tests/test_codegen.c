@@ -14,6 +14,7 @@
     X(generate_pointer_globals, "generate pointer globals") \
     X(generate_pointer_return, "generate pointer return") \
     X(generate_control_flow_function, "generate control flow function") \
+    X(generate_loop_control, "generate loop control") \
     X(generate_function_call, "generate function call") \
     X(generate_arithmetic_function, "generate arithmetic function") \
     X(generate_logical_function, "generate logical operators") \
@@ -228,6 +229,17 @@ TEST(generate_control_flow_function, "generate control flow function")
         "codegen_control_flow",
         "tests/testdata/control_flow.c",
         "tests/testdata/control_flow.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_loop_control, "generate loop control")
+{
+    CodegenFixture fixture = {
+        "codegen_loop_control",
+        "tests/testdata/loop_control.c",
+        "tests/testdata/loop_control.ll"
     };
 
     return run_codegen_fixture(&fixture);

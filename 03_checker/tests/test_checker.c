@@ -9,6 +9,7 @@
     X(check_type_declarations, "check type declarations") \
     X(check_pointer_support, "check pointer support") \
     X(check_function_control_flow, "check function control flow") \
+    X(check_for_loop, "check for loop") \
     X(check_function_call, "check function call") \
     X(check_assignment_statement, "check assignment statement") \
     X(check_binary_expression, "check binary expression") \
@@ -63,6 +64,19 @@ TEST(check_function_control_flow, "check function control flow")
     Checker checker;
 
     checker_init(&checker, "int main(){while(0);if(1){return 2;}else{return 3;}}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_for_loop, "check for loop")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

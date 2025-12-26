@@ -11,6 +11,9 @@ EXPECTED := arithmetic_driver_expected.txt
 FIB_LL := ../build/codegen_fibonacci.ll
 FIB_INPUT := testdata/fibonacci.c
 FIB_EXPECTED := fibonacci_driver_expected.txt
+FOR_LL := ../build/codegen_for_loop.ll
+FOR_INPUT := testdata/for_loop.c
+FOR_EXPECTED := for_loop_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -27,12 +30,16 @@ FIB_OBJ := $(BUILD_DIR)/fibonacci.o
 FIB_BIN := $(BUILD_DIR)/fibonacci_driver
 FIB_DRIVER := fibonacci_driver.c
 FIB_OUTPUT := $(BUILD_DIR)/fibonacci_output.txt
+FOR_OBJ := $(BUILD_DIR)/for_loop.o
+FOR_BIN := $(BUILD_DIR)/for_loop_driver
+FOR_DRIVER := for_loop_driver.c
+FOR_OUTPUT := $(BUILD_DIR)/for_loop_output.txt
 
 .PHONY: all compile generate run verify clean
 
-all: $(BIN) $(FIB_BIN)
+all: $(BIN) $(FIB_BIN) $(FOR_BIN)
 
-generate: $(LL) $(FIB_LL)
+generate: $(LL) $(FIB_LL) $(FOR_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -40,13 +47,17 @@ $(LL): $(CODEGEN_BIN) $(INPUT)
 $(FIB_LL): $(CODEGEN_BIN) $(FIB_INPUT)
 	./$(CODEGEN_BIN) $(FIB_INPUT) $(FIB_LL)
 
-compile: generate $(OBJ) $(FIB_OBJ)
+$(FOR_LL): $(CODEGEN_BIN) $(FOR_INPUT)
+	./$(CODEGEN_BIN) $(FOR_INPUT) $(FOR_LL)
 
-run: all $(OUTPUT) $(FIB_OUTPUT)
+compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ)
+
+run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
 	cmp -s $(FIB_OUTPUT) $(FIB_EXPECTED)
+	cmp -s $(FOR_OUTPUT) $(FOR_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -62,17 +73,26 @@ $(OBJ): $(LL) | $(BUILD_DIR)
 $(FIB_OBJ): $(FIB_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(FIB_LL) -o $(FIB_OBJ)
 
+$(FOR_OBJ): $(FOR_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(FOR_LL) -o $(FOR_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
 $(FIB_BIN): $(FIB_OBJ) $(FIB_DRIVER)
 	$(CC) $(CFLAGS) -o $(FIB_BIN) $(FIB_DRIVER) $(FIB_OBJ)
 
+$(FOR_BIN): $(FOR_OBJ) $(FOR_DRIVER)
+	$(CC) $(CFLAGS) -o $(FOR_BIN) $(FOR_DRIVER) $(FOR_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
 $(FIB_OUTPUT): $(FIB_BIN)
 	./$(FIB_BIN) > $(FIB_OUTPUT)
+
+$(FOR_OUTPUT): $(FOR_BIN)
+	./$(FOR_BIN) > $(FOR_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

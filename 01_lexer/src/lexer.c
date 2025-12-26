@@ -99,6 +99,10 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_WHILE, text, length);
     }
 
+    if (length == 3 && strncmp(text, "for", 3) == 0) {
+        return make_token(TOKEN_FOR, text, length);
+    }
+
     if (length == 6 && strncmp(text, "switch", 6) == 0) {
         return make_token(TOKEN_SWITCH, text, length);
     }

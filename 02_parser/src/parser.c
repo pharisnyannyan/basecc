@@ -116,6 +116,8 @@ static ParserNode *parser_parse_unary(Parser *parser);
 static ParserNode *parser_parse_parameter(Parser *parser);
 static ParserNode *parser_parse_assignment_statement(Parser *parser,
     Token name_token);
+static ParserNode *parser_parse_assignment_expression(Parser *parser,
+    Token name_token);
 static ParserNode *parser_parse_local_declaration(Parser *parser);
 
 static ParserNode *parser_parse_call(Parser *parser, Token name_token)
@@ -400,6 +402,7 @@ static ParserNode *parser_parse_expression(Parser *parser)
 }
 
 static ParserNode *parser_parse_statement(Parser *parser);
+static ParserNode *parser_parse_for(Parser *parser);
 
 static ParserNode *parser_parse_block(Parser *parser)
 {
@@ -542,6 +545,128 @@ static ParserNode *parser_parse_while(Parser *parser)
     return node;
 }
 
+static ParserNode *parser_parse_for(Parser *parser)
+{
+    Token token = parser->last_token;
+    ParserNode *init = NULL;
+    ParserNode *condition = NULL;
+    ParserNode *increment = NULL;
+    ParserNode *body = NULL;
+    ParserNode *node = NULL;
+
+    parser_next(parser);
+
+    if (!parser_match_punct(parser, "(")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected '('");
+    }
+
+    if (parser_match_punct(parser, ";")) {
+        init = parser_alloc_node(parser, PARSER_NODE_EMPTY, token);
+    } else if (token_is_type(parser->last_token)) {
+        init = parser_parse_local_declaration(parser);
+    } else if (parser->last_token.type == TOKEN_IDENT) {
+        Token name_token = parser->last_token;
+
+        parser_next(parser);
+        init = parser_parse_assignment_statement(parser, name_token);
+    } else {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected for init");
+    }
+
+    if (!init) {
+        return NULL;
+    }
+
+    if (init->type == PARSER_NODE_INVALID) {
+        return init;
+    }
+
+    if (parser_match_punct(parser, ";")) {
+        condition = parser_alloc_node(parser, PARSER_NODE_EMPTY, token);
+    } else {
+        condition = parser_parse_expression(parser);
+        if (!condition || condition->type == PARSER_NODE_INVALID) {
+            parser_free_node(init);
+            return condition;
+        }
+
+        if (!parser_match_punct(parser, ";")) {
+            ParserNode *error_node = parser_make_error(parser,
+                parser->last_token,
+                "parser: expected ';'");
+            parser_free_node(init);
+            parser_free_node(condition);
+            return error_node;
+        }
+    }
+
+    if (!condition) {
+        parser_free_node(init);
+        return NULL;
+    }
+
+    if (token_is_punct(parser->last_token, ")")) {
+        increment = parser_alloc_node(parser, PARSER_NODE_EMPTY, token);
+    } else if (parser->last_token.type == TOKEN_IDENT) {
+        Token name_token = parser->last_token;
+
+        parser_next(parser);
+        increment = parser_parse_assignment_expression(parser, name_token);
+    } else {
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
+            "parser: expected for increment");
+        parser_free_node(init);
+        parser_free_node(condition);
+        return error_node;
+    }
+
+    if (!increment) {
+        parser_free_node(init);
+        parser_free_node(condition);
+        return NULL;
+    }
+
+    if (increment->type == PARSER_NODE_INVALID) {
+        parser_free_node(init);
+        parser_free_node(condition);
+        return increment;
+    }
+
+    if (!parser_match_punct(parser, ")")) {
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
+            "parser: expected ')'");
+        parser_free_node(init);
+        parser_free_node(condition);
+        parser_free_node(increment);
+        return error_node;
+    }
+
+    body = parser_parse_statement(parser);
+    if (!body || body->type == PARSER_NODE_INVALID) {
+        parser_free_node(init);
+        parser_free_node(condition);
+        parser_free_node(increment);
+        return body;
+    }
+
+    node = parser_alloc_node(parser, PARSER_NODE_FOR, token);
+    if (!node) {
+        parser_free_node(init);
+        parser_free_node(condition);
+        parser_free_node(increment);
+        parser_free_node(body);
+        return NULL;
+    }
+
+    node->first_child = init;
+    init->next = condition;
+    condition->next = increment;
+    increment->next = body;
+    return node;
+}
+
 static ParserNode *parser_parse_return(Parser *parser)
 {
     Token token = parser->last_token;
@@ -584,6 +709,10 @@ static ParserNode *parser_parse_statement(Parser *parser)
 
     if (token.type == TOKEN_WHILE) {
         return parser_parse_while(parser);
+    }
+
+    if (token.type == TOKEN_FOR) {
+        return parser_parse_for(parser);
     }
 
     if (token.type == TOKEN_RETURN) {
@@ -647,6 +776,26 @@ static ParserNode *parser_parse_declaration(Parser *parser, Token name_token,
 static ParserNode *parser_parse_assignment_statement(Parser *parser,
     Token name_token)
 {
+    ParserNode *node = parser_parse_assignment_expression(parser, name_token);
+
+    if (!node || node->type == PARSER_NODE_INVALID) {
+        return node;
+    }
+
+    if (!parser_match_punct(parser, ";")) {
+        Token error_token = parser->last_token;
+        ParserNode *error_node = parser_make_error(parser, error_token,
+            "parser: expected ';'");
+        parser_free_node(node);
+        return error_node;
+    }
+
+    return node;
+}
+
+static ParserNode *parser_parse_assignment_expression(Parser *parser,
+    Token name_token)
+{
     ParserNode *expr = NULL;
     ParserNode *node = NULL;
 
@@ -658,14 +807,6 @@ static ParserNode *parser_parse_assignment_statement(Parser *parser,
     expr = parser_parse_expression(parser);
     if (!expr || expr->type == PARSER_NODE_INVALID) {
         return expr;
-    }
-
-    if (!parser_match_punct(parser, ";")) {
-        Token error_token = parser->last_token;
-        ParserNode *error_node = parser_make_error(parser, error_token,
-            "parser: expected ';'");
-        parser_free_node(expr);
-        return error_node;
     }
 
     node = parser_alloc_node(parser, PARSER_NODE_ASSIGN, name_token);

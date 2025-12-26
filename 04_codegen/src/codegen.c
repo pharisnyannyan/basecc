@@ -1174,6 +1174,94 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
     return 0;
 }
 
+static int codegen_emit_for(FunctionContext *ctx, const ParserNode *node)
+{
+    const ParserNode *init = node->first_child;
+    const ParserNode *condition = init ? init->next : NULL;
+    const ParserNode *increment = condition ? condition->next : NULL;
+    const ParserNode *body = increment ? increment->next : NULL;
+    char value[32];
+    char temp[32];
+    char cond_label[32];
+    char body_label[32];
+    char inc_label[32];
+    char end_label[32];
+    int body_terminated = 0;
+    TypeDesc condition_type;
+
+    if (!init || !condition || !increment || !body) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: incomplete for statement");
+    }
+
+    if (body->next) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unexpected for statement");
+    }
+
+    if (codegen_emit_statement(ctx, init)) {
+        return 1;
+    }
+
+    if (ctx->codegen->error_message) {
+        return 0;
+    }
+
+    codegen_format_label(cond_label, sizeof(cond_label), "for.cond",
+        ctx->next_label_id++);
+    codegen_format_label(body_label, sizeof(body_label), "for.body",
+        ctx->next_label_id++);
+    codegen_format_label(inc_label, sizeof(inc_label), "for.inc",
+        ctx->next_label_id++);
+    codegen_format_label(end_label, sizeof(end_label), "for.end",
+        ctx->next_label_id++);
+
+    fprintf(ctx->out, "  br label %%%s\n", cond_label);
+    fprintf(ctx->out, "%s:\n", cond_label);
+
+    if (condition->type == PARSER_NODE_EMPTY) {
+        fprintf(ctx->out, "  br label %%%s\n", body_label);
+    } else {
+        if (!codegen_emit_expression(ctx, condition, value, sizeof(value),
+            &condition_type)) {
+            return 0;
+        }
+
+        if (!codegen_type_is_integer(condition_type)) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected integer condition");
+        }
+
+        snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
+        fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
+            temp,
+            body_label,
+            end_label);
+    }
+
+    fprintf(ctx->out, "%s:\n", body_label);
+    body_terminated = codegen_emit_statement(ctx, body);
+    if (ctx->codegen->error_message) {
+        return 0;
+    }
+    if (!body_terminated) {
+        fprintf(ctx->out, "  br label %%%s\n", inc_label);
+    }
+
+    fprintf(ctx->out, "%s:\n", inc_label);
+    if (increment->type != PARSER_NODE_EMPTY) {
+        codegen_emit_statement(ctx, increment);
+        if (ctx->codegen->error_message) {
+            return 0;
+        }
+    }
+
+    fprintf(ctx->out, "  br label %%%s\n", cond_label);
+    fprintf(ctx->out, "%s:\n", end_label);
+    return 0;
+}
+
 static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
 {
     char value[32];
@@ -1303,6 +1391,8 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
     }
     case PARSER_NODE_WHILE:
         return codegen_emit_while(ctx, node);
+    case PARSER_NODE_FOR:
+        return codegen_emit_for(ctx, node);
     case PARSER_NODE_RETURN:
         if (!node->first_child || node->first_child->next) {
             return codegen_set_error(ctx->codegen,

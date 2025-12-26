@@ -10,6 +10,7 @@
     X(parse_type_declarations, "parse type declarations") \
     X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_function_control_flow, "parse function control flow") \
+    X(parse_for_loop, "parse for loop") \
     X(parse_function_call, "parse function call") \
     X(parse_assignment_statement, "parse assignment statement") \
     X(parse_binary_expression, "parse binary expression") \
@@ -171,6 +172,37 @@ TEST(parse_function_control_flow, "parse function control flow")
     ASSERT_TRUE(node->first_child->first_child->first_child->next->type
         == PARSER_NODE_IF,
         "expected if statement");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_for_loop, "parse for loop")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit");
+    ASSERT_TRUE(node->first_child != NULL, "expected function");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    ASSERT_TRUE(node->first_child->first_child != NULL,
+        "expected function body");
+    ASSERT_TRUE(node->first_child->first_child->type == PARSER_NODE_BLOCK,
+        "expected function block");
+    ASSERT_TRUE(node->first_child->first_child->first_child != NULL,
+        "expected first statement");
+    ASSERT_TRUE(node->first_child->first_child->first_child->next != NULL,
+        "expected for statement");
+    ASSERT_TRUE(node->first_child->first_child->first_child->next->type
+        == PARSER_NODE_FOR,
+        "expected for statement");
 
     parser_free_node(node);
     return 1;

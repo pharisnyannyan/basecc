@@ -11,6 +11,7 @@ typedef enum TokenType {
     TOKEN_IF,
     TOKEN_ELSE,
     TOKEN_WHILE,
+    TOKEN_FOR,
     TOKEN_SWITCH,
     TOKEN_CASE,
     TOKEN_RETURN,

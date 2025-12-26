@@ -157,6 +157,22 @@ static int checker_validate_expression(Checker *checker,
     return checker_set_error(checker, "checker: expected expression");
 }
 
+static int checker_validate_assignment(Checker *checker,
+    const ParserNode *node)
+{
+    if (node->token.type != TOKEN_IDENT) {
+        return checker_set_error(checker,
+            "checker: expected assignment identifier");
+    }
+
+    if (!node->first_child || node->first_child->next) {
+        return checker_set_error(checker,
+            "checker: expected assignment expression");
+    }
+
+    return checker_validate_expression(checker, node->first_child);
+}
+
 static int checker_validate_statement(Checker *checker,
     const ParserNode *node)
 {
@@ -202,17 +218,7 @@ static int checker_validate_statement(Checker *checker,
         return 1;
     }
     case PARSER_NODE_ASSIGN: {
-        if (node->token.type != TOKEN_IDENT) {
-            return checker_set_error(checker,
-                "checker: expected assignment identifier");
-        }
-
-        if (!node->first_child || node->first_child->next) {
-            return checker_set_error(checker,
-                "checker: expected assignment expression");
-        }
-
-        return checker_validate_expression(checker, node->first_child);
+        return checker_validate_assignment(checker, node);
     }
     case PARSER_NODE_WHILE: {
         const ParserNode *condition = node->first_child;
@@ -229,6 +235,57 @@ static int checker_validate_statement(Checker *checker,
         }
 
         if (!checker_validate_expression(checker, condition)) {
+            return 0;
+        }
+
+        return checker_validate_statement(checker, body);
+    }
+    case PARSER_NODE_FOR: {
+        const ParserNode *init = node->first_child;
+        const ParserNode *condition = init ? init->next : NULL;
+        const ParserNode *increment = condition ? condition->next : NULL;
+        const ParserNode *body = increment ? increment->next : NULL;
+
+        if (!init || !condition || !increment || !body) {
+            return checker_set_error(checker,
+                "checker: incomplete for statement");
+        }
+
+        if (body->next) {
+            return checker_set_error(checker,
+                "checker: unexpected for statement");
+        }
+
+        if (init->type != PARSER_NODE_EMPTY
+            && init->type != PARSER_NODE_DECLARATION
+            && init->type != PARSER_NODE_ASSIGN) {
+            return checker_set_error(checker,
+                "checker: expected for init");
+        }
+
+        if (init->type == PARSER_NODE_DECLARATION
+            && !checker_validate_declaration(checker, init)) {
+            return 0;
+        }
+
+        if (init->type == PARSER_NODE_ASSIGN
+            && !checker_validate_assignment(checker, init)) {
+            return 0;
+        }
+
+        if (condition->type != PARSER_NODE_EMPTY
+            && !checker_validate_expression(checker, condition)) {
+            return 0;
+        }
+
+        if (increment->type != PARSER_NODE_EMPTY
+            && increment->type != PARSER_NODE_ASSIGN) {
+            return checker_set_error(checker,
+                "checker: expected for increment");
+        }
+
+        if (increment->type == PARSER_NODE_ASSIGN
+            && !checker_validate_assignment(checker, increment)) {
             return 0;
         }
 

@@ -20,6 +20,10 @@ BaseCC has evolved from a minimal lexer/parser into a functional C compiler targ
 - **Storage Classes**: `extern`, `static`, `const`.
 - **Functions**: Global function definitions, recursive calls, and external function calls.
 
+## Road to Self-Hosting
+
+A key objective for BaseCC is to eventually be self-hosting (capable of compiling itself). See [SELF_HOSTING.md](SELF_HOSTING.md) for the detailed roadmap and missing features ordered by priority and gain.
+
 ## Project Goal
 
 The project deliberately favors:

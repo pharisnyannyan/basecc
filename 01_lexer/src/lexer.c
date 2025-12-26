@@ -200,7 +200,7 @@ static Token lex_punctuator(Lexer *lexer)
 
     if (ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '('
         || ch == '%' || ch == ')' || ch == '{' || ch == '}' || ch == ';'
-        || ch == ',' || ch == '=' || ch == '.') {
+        || ch == ',' || ch == '=' || ch == '.' || ch == '[' || ch == ']') {
         lexer->pos++;
         return make_token(TOKEN_PUNCT, lexer->input + start, 1);
     }

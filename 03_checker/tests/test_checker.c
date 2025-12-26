@@ -8,6 +8,7 @@
     X(check_translation_unit, "check translation unit") \
     X(check_type_declarations, "check type declarations") \
     X(check_pointer_support, "check pointer support") \
+    X(check_array_support, "check array support") \
     X(check_typedef_const_cast, "check typedef const cast") \
     X(check_struct_definition, "check struct definition") \
     X(check_function_control_flow, "check function control flow") \
@@ -59,6 +60,21 @@ TEST(check_pointer_support, "check pointer support")
     Checker checker;
 
     checker_init(&checker, "int value; int *ptr = &value; int main(){return *ptr;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_array_support, "check array support")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int global[3];"
+        "int main(){int local[2]; global[0]=1; local[0]=global[0];"
+        "return local[0];}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

@@ -9,6 +9,7 @@
     X(parse_translation_unit, "parse translation unit") \
     X(parse_type_declarations, "parse type declarations") \
     X(parse_pointer_declaration, "parse pointer declaration") \
+    X(parse_array_declaration, "parse array declaration") \
     X(parse_typedefs_and_const, "parse typedefs and const") \
     X(parse_struct_definition, "parse struct definition") \
     X(parse_function_control_flow, "parse function control flow") \
@@ -143,6 +144,56 @@ TEST(parse_pointer_declaration, "parse pointer declaration")
     ASSERT_TRUE(expr->first_child != NULL, "expected dereference operand");
     ASSERT_TRUE(expr->first_child->type == PARSER_NODE_IDENTIFIER,
         "expected identifier operand");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_array_declaration, "parse array declaration")
+{
+    Parser parser;
+    ParserNode *node = NULL;
+    ParserNode *function = NULL;
+    ParserNode *block = NULL;
+    ParserNode *statement = NULL;
+
+    parser_init(&parser,
+        "int values[3];"
+        "int main(){int data[2]; data[0] = 1; return data[1];}");
+
+    node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+    ASSERT_TRUE(node->first_child != NULL, "expected global declaration");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(node->first_child->array_length == 3,
+        "expected global array length");
+
+    function = node->first_child->next;
+    ASSERT_TRUE(function != NULL, "expected function node");
+    ASSERT_TRUE(function->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    block = function->first_child;
+    ASSERT_TRUE(block != NULL, "expected function block");
+    ASSERT_TRUE(block->type == PARSER_NODE_BLOCK, "expected block node");
+
+    statement = block->first_child;
+    ASSERT_TRUE(statement != NULL, "expected local declaration");
+    ASSERT_TRUE(statement->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(statement->array_length == 2,
+        "expected local array length");
+
+    statement = statement->next;
+    ASSERT_TRUE(statement != NULL, "expected assignment statement");
+    ASSERT_TRUE(statement->type == PARSER_NODE_ASSIGN,
+        "expected assignment node");
+    ASSERT_TRUE(statement->first_child != NULL, "expected assignment target");
+    ASSERT_TRUE(statement->first_child->type == PARSER_NODE_INDEX,
+        "expected index expression");
 
     parser_free_node(node);
     return 1;

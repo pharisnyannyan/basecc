@@ -30,7 +30,8 @@
   X(check_mismatched_parentheses, "check mismatched parentheses")              \
   X(check_unexpected_closing_paren, "check unexpected closing paren")          \
   X(check_missing_semicolon, "check missing semicolon")                        \
-  X(check_expected_number, "check expected number")
+  X(check_expected_number, "check expected number")                            \
+  X(check_enum_definition, "check enum definition")
 
 TEST(check_translation_unit, "check translation unit") {
   Checker checker;
@@ -357,6 +358,32 @@ TEST(check_expected_number, "check expected number") {
   ASSERT_TRUE(
       test_error_contains(checker_error(&checker), "expected expression"),
       "expected expression error");
+
+  return 1;
+}
+
+TEST(check_enum_definition, "check enum definition") {
+  Checker checker;
+
+  checker_init(&checker, "enum Color { RED, GREEN, BLUE };");
+  ASSERT_TRUE(checker_check(&checker), "expected check success");
+  ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+  checker_init(&checker, "enum Status { OK = 0, ERROR = -1 };");
+  ASSERT_TRUE(checker_check(&checker), "expected check success");
+  ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+  checker_init(&checker, "enum Empty {};");
+  ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+  ASSERT_TRUE(test_error_contains(checker_error(&checker),
+                                  "checker: expected enumerator"),
+              "expected enumerator error");
+
+  checker_init(&checker, "enum { 123 };");
+  ASSERT_TRUE(!checker_check(&checker), "expected check failure");
+  ASSERT_TRUE(test_error_contains(checker_error(&checker),
+                                  "parser: expected enum name"),
+              "expected enum name error");
 
   return 1;
 }

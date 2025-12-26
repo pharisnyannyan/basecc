@@ -31,7 +31,8 @@
   X(parse_mismatched_parentheses, "parse mismatched parentheses")              \
   X(parse_unexpected_closing_paren, "parse unexpected closing paren")          \
   X(parse_missing_semicolon, "parse missing semicolon")                        \
-  X(parse_expected_number, "parse expected number")
+  X(parse_expected_number, "parse expected number")                            \
+  X(parse_enum_definition, "parse enum definition")
 
 static int token_equals(Token token, const char *text) {
   size_t length = strlen(text);
@@ -985,6 +986,88 @@ TEST(parse_expected_number, "parse expected number") {
   ASSERT_TRUE(node->type == PARSER_NODE_INVALID, "expected invalid node");
 
   parser_free_node(node);
+  return 1;
+}
+
+TEST(parse_enum_definition, "parse enum definition") {
+  Parser parser;
+  ParserNode *node = NULL;
+  ParserNode *enumerator = NULL;
+
+  // Test 1: Simple enum
+  parser_init(&parser, "enum Color { RED, GREEN, BLUE };");
+  node = parser_parse(&parser);
+  ASSERT_TRUE(node != NULL, "expected parser node");
+  ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+  ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+              "expected translation unit node");
+  ASSERT_TRUE(node->first_child != NULL, "expected enum definition");
+  ASSERT_TRUE(node->first_child->type == PARSER_NODE_ENUM,
+              "expected enum node");
+  ASSERT_TRUE(token_equals(node->first_child->token, "Color"),
+              "expected enum name 'Color'");
+
+  enumerator = node->first_child->first_child;
+  ASSERT_TRUE(enumerator != NULL, "expected first enumerator");
+  ASSERT_TRUE(enumerator->type == PARSER_NODE_ENUMERATOR,
+              "expected enumerator node");
+  ASSERT_TRUE(token_equals(enumerator->token, "RED"),
+              "expected enumerator 'RED'");
+
+  enumerator = enumerator->next;
+  ASSERT_TRUE(enumerator != NULL, "expected second enumerator");
+  ASSERT_TRUE(token_equals(enumerator->token, "GREEN"),
+              "expected enumerator 'GREEN'");
+
+  enumerator = enumerator->next;
+  ASSERT_TRUE(enumerator != NULL, "expected third enumerator");
+  ASSERT_TRUE(token_equals(enumerator->token, "BLUE"),
+              "expected enumerator 'BLUE'");
+
+  parser_free_node(node);
+
+  // Test 2: Enum with values
+  parser_init(&parser, "enum Status { OK = 0, ERROR = -1 };");
+  node = parser_parse(&parser);
+  ASSERT_TRUE(node != NULL, "expected parser node");
+  ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+  enumerator = node->first_child->first_child;
+  ASSERT_TRUE(token_equals(enumerator->token, "OK"),
+              "expected enumerator 'OK'");
+  ASSERT_TRUE(enumerator->first_child != NULL, "expected initializer");
+  ASSERT_TRUE(enumerator->first_child->type == PARSER_NODE_NUMBER,
+              "expected number");
+
+  enumerator = enumerator->next;
+  ASSERT_TRUE(token_equals(enumerator->token, "ERROR"),
+              "expected enumerator 'ERROR'");
+  ASSERT_TRUE(enumerator->first_child != NULL, "expected initializer");
+  ASSERT_TRUE(enumerator->first_child->type == PARSER_NODE_NUMBER,
+              "expected number");
+  ASSERT_TRUE(enumerator->first_child->token.value == -1, "expected value -1");
+
+  parser_free_node(node);
+
+  // Test 3: Trailing comma and whitespace
+  parser_init(&parser, "enum  Mode  { A , B , } ; ");
+  node = parser_parse(&parser);
+  ASSERT_TRUE(node != NULL, "expected parser node");
+  ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+  ASSERT_TRUE(node->first_child->type == PARSER_NODE_ENUM,
+              "expected enum node");
+  ASSERT_TRUE(token_equals(node->first_child->token, "Mode"),
+              "expected enum name 'Mode'");
+
+  enumerator = node->first_child->first_child;
+  ASSERT_TRUE(token_equals(enumerator->token, "A"), "expected 'A'");
+
+  enumerator = enumerator->next;
+  ASSERT_TRUE(token_equals(enumerator->token, "B"), "expected 'B'");
+  ASSERT_TRUE(enumerator->next == NULL, "expected end of list");
+
+  parser_free_node(node);
+
   return 1;
 }
 

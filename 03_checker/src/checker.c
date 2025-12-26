@@ -371,6 +371,40 @@ static int checker_validate_declaration(Checker *checker,
     return 1;
 }
 
+static int checker_validate_struct_definition(Checker *checker,
+    const ParserNode *node)
+{
+    const ParserNode *field = NULL;
+
+    if (node->type != PARSER_NODE_STRUCT) {
+        return checker_set_error(checker, "checker: expected struct");
+    }
+
+    if (node->token.type != TOKEN_IDENT && node->token.type != TOKEN_STRUCT) {
+        return checker_set_error(checker,
+            "checker: expected struct name");
+    }
+
+    for (field = node->first_child; field; field = field->next) {
+        if (field->type != PARSER_NODE_DECLARATION) {
+            return checker_set_error(checker,
+                "checker: expected struct field");
+        }
+
+        if (field->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected struct field identifier");
+        }
+
+        if (field->first_child) {
+            return checker_set_error(checker,
+                "checker: unexpected struct field initializer");
+        }
+    }
+
+    return 1;
+}
+
 static int checker_validate_function(Checker *checker, const ParserNode *node)
 {
     const ParserNode *child = NULL;
@@ -439,6 +473,13 @@ static int checker_validate_translation_unit(Checker *checker,
     for (child = node->first_child; child; child = child->next) {
         if (child->type == PARSER_NODE_DECLARATION) {
             if (!checker_validate_declaration(checker, child)) {
+                return 0;
+            }
+            continue;
+        }
+
+        if (child->type == PARSER_NODE_STRUCT) {
+            if (!checker_validate_struct_definition(checker, child)) {
                 return 0;
             }
             continue;

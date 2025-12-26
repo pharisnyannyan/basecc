@@ -13,6 +13,7 @@
     X(parse_for_loop, "parse for loop") \
     X(parse_function_call, "parse function call") \
     X(parse_assignment_statement, "parse assignment statement") \
+    X(parse_dereference_assignment, "parse dereference assignment") \
     X(parse_binary_expression, "parse binary expression") \
     X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
     X(parse_nested_parentheses, "parse nested parentheses") \
@@ -282,15 +283,60 @@ TEST(parse_assignment_statement, "parse assignment statement")
     ASSERT_TRUE(stmt != NULL, "expected assignment statement");
     ASSERT_TRUE(stmt->type == PARSER_NODE_ASSIGN,
         "expected assignment statement");
-    ASSERT_TRUE(token_equals(stmt->token, "a"),
-        "expected assignment target");
     ASSERT_TRUE(stmt->first_child != NULL,
+        "expected assignment target");
+    ASSERT_TRUE(stmt->first_child->type == PARSER_NODE_IDENTIFIER,
+        "expected assignment identifier");
+    ASSERT_TRUE(token_equals(stmt->first_child->token, "a"),
+        "expected assignment target");
+    ASSERT_TRUE(stmt->first_child->next != NULL,
         "expected assignment expression");
 
     stmt = stmt->next;
     ASSERT_TRUE(stmt != NULL, "expected return statement");
     ASSERT_TRUE(stmt->type == PARSER_NODE_RETURN,
         "expected return statement");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_dereference_assignment, "parse dereference assignment")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->first_child != NULL, "expected function");
+    ASSERT_TRUE(node->first_child->first_child != NULL,
+        "expected function body");
+
+    ParserNode *stmt = node->first_child->first_child->first_child;
+    ASSERT_TRUE(stmt != NULL, "expected declaration statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_DECLARATION,
+        "expected declaration statement");
+
+    stmt = stmt->next;
+    ASSERT_TRUE(stmt != NULL, "expected declaration statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_DECLARATION,
+        "expected declaration statement");
+
+    stmt = stmt->next;
+    ASSERT_TRUE(stmt != NULL, "expected assignment statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_ASSIGN,
+        "expected assignment statement");
+    ASSERT_TRUE(stmt->first_child != NULL,
+        "expected assignment target");
+    ASSERT_TRUE(stmt->first_child->type == PARSER_NODE_UNARY,
+        "expected unary assignment target");
+    ASSERT_TRUE(token_equals(stmt->first_child->token, "*"),
+        "expected dereference assignment target");
+    ASSERT_TRUE(stmt->first_child->next != NULL,
+        "expected assignment expression");
 
     parser_free_node(node);
     return 1;

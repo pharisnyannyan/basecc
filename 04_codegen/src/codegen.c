@@ -1282,26 +1282,100 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
         const LocalSymbol *local = NULL;
         const GlobalSymbol *global = NULL;
         const ParserNode *param = NULL;
+        const ParserNode *left = node->first_child;
+        const ParserNode *right = left ? left->next : NULL;
         char value[32];
         char type_name[32];
         TypeDesc expr_type;
 
-        if (node->token.type != TOKEN_IDENT) {
-            return codegen_set_error(ctx->codegen,
-                "codegen: expected assignment identifier");
-        }
-
-        if (!node->first_child || node->first_child->next) {
+        if (!left || !right || right->next) {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected assignment expression");
         }
 
-        if (!codegen_emit_expression(ctx, node->first_child, value,
+        if (left->type == PARSER_NODE_UNARY
+            && token_is_punct(left->token, "*")) {
+            const ParserNode *operand = left->first_child;
+            char pointer_value[32];
+            TypeDesc pointer_type;
+            TypeDesc target_type;
+            TypeInfo info;
+            Token target_token;
+
+            if (!operand || operand->next) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected assignment target");
+            }
+
+            if (!codegen_emit_expression(ctx, operand, pointer_value,
+                sizeof(pointer_value), &pointer_type)) {
+                return 0;
+            }
+
+            if (pointer_type.pointer_depth <= 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected pointer assignment");
+            }
+
+            if (!codegen_emit_expression(ctx, right, value,
+                sizeof(value), &expr_type)) {
+                return 0;
+            }
+
+            target_type = pointer_type;
+            target_type.pointer_depth--;
+            codegen_format_desc_type(target_type, type_name,
+                sizeof(type_name));
+
+            if (target_type.pointer_depth > 0) {
+                if (expr_type.pointer_depth != target_type.pointer_depth
+                    || expr_type.base_token != target_type.base_token) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: assignment type mismatch");
+                }
+            } else {
+                if (!codegen_type_is_integer(expr_type)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: expected integer assignment");
+                }
+
+                target_token.type = target_type.base_token;
+                target_token.start = NULL;
+                target_token.length = 0;
+                target_token.value = 0;
+                info = codegen_type_info(target_token);
+                if (info.width < 32) {
+                    char cast_value[32];
+
+                    snprintf(cast_value, sizeof(cast_value), "%%t%d",
+                        ctx->next_temp_id++);
+                    fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+                        cast_value,
+                        value,
+                        type_name);
+                    snprintf(value, sizeof(value), "%s", cast_value);
+                }
+            }
+
+            fprintf(ctx->out, "  store %s %s, %s* %s\n",
+                type_name,
+                value,
+                type_name,
+                pointer_value);
+            return 0;
+        }
+
+        if (left->type != PARSER_NODE_IDENTIFIER) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected assignment target");
+        }
+
+        if (!codegen_emit_expression(ctx, right, value,
             sizeof(value), &expr_type)) {
             return 0;
         }
 
-        local = codegen_find_local(ctx, node->token);
+        local = codegen_find_local(ctx, left->token);
         if (local) {
             codegen_format_type(local->type_token, local->pointer_depth,
                 type_name, sizeof(type_name));
@@ -1340,13 +1414,13 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             return 0;
         }
 
-        param = codegen_find_param(ctx, node->token);
+        param = codegen_find_param(ctx, left->token);
         if (param) {
             return codegen_set_error(ctx->codegen,
                 "codegen: assignment to parameter not supported");
         }
 
-        global = codegen_find_global(ctx, node->token);
+        global = codegen_find_global(ctx, left->token);
         if (!global) {
             return codegen_set_error(ctx->codegen,
                 "codegen: unknown assignment target");
@@ -1385,8 +1459,8 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             type_name,
             value,
             type_name,
-            (int)node->token.length,
-            node->token.start);
+            (int)left->token.length,
+            left->token.start);
         return 0;
     }
     case PARSER_NODE_WHILE:

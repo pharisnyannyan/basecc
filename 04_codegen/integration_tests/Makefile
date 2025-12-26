@@ -17,6 +17,9 @@ FOR_EXPECTED := for_loop_driver_expected.txt
 SWAP_LL := ../build/codegen_swap.ll
 SWAP_INPUT := testdata/swap.c
 SWAP_EXPECTED := swap_driver_expected.txt
+FILL_LL := ../build/codegen_fill_array.ll
+FILL_INPUT := testdata/fill_array.c
+FILL_EXPECTED := fill_array_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -41,12 +44,16 @@ SWAP_OBJ := $(BUILD_DIR)/swap.o
 SWAP_BIN := $(BUILD_DIR)/swap_driver
 SWAP_DRIVER := swap_driver.c
 SWAP_OUTPUT := $(BUILD_DIR)/swap_output.txt
+FILL_OBJ := $(BUILD_DIR)/fill_array.o
+FILL_BIN := $(BUILD_DIR)/fill_array_driver
+FILL_DRIVER := fill_array_driver.c
+FILL_OUTPUT := $(BUILD_DIR)/fill_array_output.txt
 
 .PHONY: all compile generate run verify clean
 
-all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN)
+all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN)
 
-generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL)
+generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -60,15 +67,19 @@ $(FOR_LL): $(CODEGEN_BIN) $(FOR_INPUT)
 $(SWAP_LL): $(CODEGEN_BIN) $(SWAP_INPUT)
 	./$(CODEGEN_BIN) $(SWAP_INPUT) $(SWAP_LL)
 
-compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ)
+$(FILL_LL): $(CODEGEN_BIN) $(FILL_INPUT)
+	./$(CODEGEN_BIN) $(FILL_INPUT) $(FILL_LL)
 
-run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT)
+compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ)
+
+run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) $(FILL_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
 	cmp -s $(FIB_OUTPUT) $(FIB_EXPECTED)
 	cmp -s $(FOR_OUTPUT) $(FOR_EXPECTED)
 	cmp -s $(SWAP_OUTPUT) $(SWAP_EXPECTED)
+	cmp -s $(FILL_OUTPUT) $(FILL_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -90,6 +101,9 @@ $(FOR_OBJ): $(FOR_LL) | $(BUILD_DIR)
 $(SWAP_OBJ): $(SWAP_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(SWAP_LL) -o $(SWAP_OBJ)
 
+$(FILL_OBJ): $(FILL_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(FILL_LL) -o $(FILL_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
@@ -102,6 +116,9 @@ $(FOR_BIN): $(FOR_OBJ) $(FOR_DRIVER)
 $(SWAP_BIN): $(SWAP_OBJ) $(SWAP_DRIVER)
 	$(CC) $(CFLAGS) -o $(SWAP_BIN) $(SWAP_DRIVER) $(SWAP_OBJ)
 
+$(FILL_BIN): $(FILL_OBJ) $(FILL_DRIVER)
+	$(CC) $(CFLAGS) -o $(FILL_BIN) $(FILL_DRIVER) $(FILL_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
@@ -113,6 +130,9 @@ $(FOR_OUTPUT): $(FOR_BIN)
 
 $(SWAP_OUTPUT): $(SWAP_BIN)
 	./$(SWAP_BIN) > $(SWAP_OUTPUT)
+
+$(FILL_OUTPUT): $(FILL_BIN)
+	./$(FILL_BIN) > $(FILL_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

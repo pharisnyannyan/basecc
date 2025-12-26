@@ -20,6 +20,7 @@
     X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
     X(parse_nested_parentheses, "parse nested parentheses") \
     X(parse_unary_arithmetic, "parse unary arithmetic") \
+    X(parse_sizeof, "parse sizeof") \
     X(parse_logical_expression, "parse logical expression") \
     X(parse_invalid_token, "parse invalid token") \
     X(parse_mismatched_parentheses, "parse mismatched parentheses") \
@@ -682,6 +683,48 @@ TEST(parse_unary_arithmetic, "parse unary arithmetic")
     ASSERT_TRUE(right->first_child != NULL, "expected unary operand");
     ASSERT_TRUE(right->first_child->type == PARSER_NODE_NUMBER,
         "expected number expression");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_sizeof, "parse sizeof")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+    ParserNode *left = NULL;
+    ParserNode *right = NULL;
+
+    parser_init(&parser,
+        "int main(){int value; return sizeof(value) + sizeof(int);}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+
+    expr = node->first_child
+        ->first_child
+        ->first_child
+        ->next
+        ->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_BINARY,
+        "expected binary expression");
+
+    left = expr->first_child;
+    right = left ? left->next : NULL;
+    ASSERT_TRUE(left != NULL, "expected left operand");
+    ASSERT_TRUE(right != NULL, "expected right operand");
+    ASSERT_TRUE(left->type == PARSER_NODE_SIZEOF,
+        "expected sizeof expression");
+    ASSERT_TRUE(left->first_child != NULL, "expected sizeof operand");
+    ASSERT_TRUE(left->first_child->type == PARSER_NODE_IDENTIFIER,
+        "expected identifier operand");
+
+    ASSERT_TRUE(right->type == PARSER_NODE_SIZEOF,
+        "expected sizeof type expression");
+    ASSERT_TRUE(right->first_child == NULL, "expected no sizeof operand");
+    ASSERT_TRUE(right->type_token.type == TOKEN_INT, "expected int type");
 
     parser_free_node(node);
     return 1;

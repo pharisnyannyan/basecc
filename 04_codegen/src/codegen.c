@@ -270,6 +270,16 @@ static const GlobalSymbol *codegen_find_global(const FunctionContext *ctx,
     Token name);
 static const LocalSymbol *codegen_find_local(const FunctionContext *ctx,
     Token name);
+static int codegen_expression_type(FunctionContext *ctx,
+    const ParserNode *node,
+    TypeDesc *type_out);
+static int codegen_resolve_member_type(FunctionContext *ctx,
+    const ParserNode *node,
+    TypeDesc *field_type_out);
+static int codegen_emit_sizeof_type(FunctionContext *ctx,
+    TypeDesc target_type,
+    char *value,
+    size_t value_size);
 static int codegen_emit_expression(FunctionContext *ctx,
     const ParserNode *node,
     char *value,
@@ -501,6 +511,136 @@ static int codegen_emit_member_pointer(FunctionContext *ctx,
         struct_type,
         base_value,
         field_index);
+    return 1;
+}
+
+static int codegen_resolve_member_type(FunctionContext *ctx,
+    const ParserNode *node,
+    TypeDesc *field_type_out)
+{
+    const ParserNode *base = node->first_child;
+    const ParserNode *field = base ? base->next : NULL;
+    const StructSymbol *symbol = NULL;
+    Token struct_token;
+    size_t field_index = 0;
+    int found = 0;
+
+    if (!base || !field || field->next) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member access operands");
+    }
+
+    if (field->type != PARSER_NODE_IDENTIFIER
+        || field->token.type != TOKEN_IDENT) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member field identifier");
+    }
+
+    if (token_is_punct(node->token, ".")) {
+        const LocalSymbol *local = codegen_find_local(ctx, base->token);
+        const GlobalSymbol *global = NULL;
+
+        if (base->type != PARSER_NODE_IDENTIFIER) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected struct identifier");
+        }
+
+        if (local) {
+            if (local->pointer_depth != 0
+                || local->type_token.type != TOKEN_STRUCT) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected struct value");
+            }
+            struct_token = local->type_token;
+        } else {
+            global = codegen_find_global(ctx, base->token);
+            if (!global) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: unknown struct identifier");
+            }
+
+            if (global->pointer_depth != 0
+                || global->type_token.type != TOKEN_STRUCT) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected struct value");
+            }
+            struct_token = global->type_token;
+        }
+    } else if (token_is_punct(node->token, "->")) {
+        TypeDesc base_type;
+
+        if (!codegen_expression_type(ctx, base, &base_type)) {
+            return 0;
+        }
+
+        if (base_type.pointer_depth != 1
+            || base_type.type_token.type != TOKEN_STRUCT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected struct pointer");
+        }
+        struct_token = base_type.type_token;
+    } else {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member access operator");
+    }
+
+    symbol = codegen_find_struct(ctx->structs, ctx->struct_count,
+        struct_token);
+    if (!symbol) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unknown struct type");
+    }
+
+    for (const ParserNode *field_node = symbol->fields;
+        field_node;
+        field_node = field_node->next) {
+        if (codegen_name_matches(field->token,
+                field_node->token.start,
+                field_node->token.length)) {
+            *field_type_out = codegen_make_type_desc(field_node->type_token,
+                field_node->pointer_depth);
+            found = 1;
+            break;
+        }
+        field_index++;
+    }
+
+    if (!found) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unknown struct field");
+    }
+
+    return 1;
+}
+
+static int codegen_emit_sizeof_type(FunctionContext *ctx,
+    TypeDesc target_type,
+    char *value,
+    size_t value_size)
+{
+    char element_type[32];
+    char pointer_type[32];
+    char gep_value[32];
+
+    if (!codegen_require_struct(ctx->codegen, ctx->structs, ctx->struct_count,
+            target_type.type_token)) {
+        return 0;
+    }
+
+    codegen_format_desc_type(target_type, element_type, sizeof(element_type));
+    codegen_format_type(target_type.type_token, target_type.pointer_depth + 1,
+        pointer_type, sizeof(pointer_type));
+
+    snprintf(gep_value, sizeof(gep_value), "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out, "  %s = getelementptr %s, %s null, i32 1\n",
+        gep_value,
+        element_type,
+        pointer_type);
+    snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out, "  %s = ptrtoint %s %s to i32\n",
+        value,
+        pointer_type,
+        gep_value);
     return 1;
 }
 
@@ -924,6 +1064,324 @@ static int codegen_emit_logical_binary(FunctionContext *ctx,
     return 1;
 }
 
+static int codegen_expression_type(FunctionContext *ctx,
+    const ParserNode *node,
+    TypeDesc *type_out)
+{
+    if (node->type == PARSER_NODE_NUMBER) {
+        *type_out = codegen_int_type_desc();
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_CALL) {
+        const FunctionSymbol *symbol = NULL;
+        const ParserNode *arg = NULL;
+        const ParserNode *param = NULL;
+        size_t arg_count = 0;
+        size_t index = 0;
+
+        if (node->token.type != TOKEN_IDENT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected call identifier");
+        }
+
+        symbol = codegen_find_function(ctx, node->token);
+        if (!symbol) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unknown function");
+        }
+
+        if (!codegen_require_struct(ctx->codegen, ctx->structs,
+                ctx->struct_count, symbol->type_token)) {
+            return 0;
+        }
+
+        arg_count = symbol->param_count;
+        arg = node->first_child;
+        param = symbol->param_list;
+
+        for (index = 0; index < arg_count; index++) {
+            TypeDesc arg_type;
+            TypeDesc param_type;
+
+            if (!arg || !param) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: argument count mismatch");
+            }
+
+            if (!codegen_expression_type(ctx, arg, &arg_type)) {
+                return 0;
+            }
+
+            param_type = codegen_make_type_desc(param->type_token,
+                param->pointer_depth);
+
+            if (!codegen_require_struct(ctx->codegen, ctx->structs,
+                    ctx->struct_count, param_type.type_token)) {
+                return 0;
+            }
+
+            if (param_type.pointer_depth > 0) {
+                if (arg_type.pointer_depth == 0
+                    && codegen_is_null_pointer_literal(arg)) {
+                    /* ok */
+                } else if (arg_type.pointer_depth != param_type.pointer_depth
+                    || !codegen_type_token_equals(arg_type.type_token,
+                        param_type.type_token)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: argument type mismatch");
+                }
+            } else {
+                if (param_type.type_token.type == TOKEN_STRUCT) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: struct argument not supported");
+                }
+
+                if (!codegen_type_is_integer(arg_type)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: expected integer argument");
+                }
+            }
+
+            arg = arg->next;
+            param = param->next;
+        }
+
+        if (arg) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: argument count mismatch");
+        }
+
+        *type_out = codegen_make_type_desc(symbol->type_token,
+            symbol->pointer_depth);
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_IDENTIFIER) {
+        const LocalSymbol *local = NULL;
+        const ParserNode *param = NULL;
+        const GlobalSymbol *symbol = NULL;
+
+        if (node->token.type != TOKEN_IDENT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected identifier");
+        }
+
+        if (node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unexpected identifier children");
+        }
+
+        local = codegen_find_local(ctx, node->token);
+        if (local) {
+            *type_out = codegen_make_type_desc(local->type_token,
+                local->pointer_depth);
+            return 1;
+        }
+
+        param = codegen_find_param(ctx, node->token);
+        if (param) {
+            *type_out = codegen_make_type_desc(param->type_token,
+                param->pointer_depth);
+            return 1;
+        }
+
+        symbol = codegen_find_global(ctx, node->token);
+        if (!symbol) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unknown global");
+        }
+
+        *type_out = codegen_make_type_desc(symbol->type_token,
+            symbol->pointer_depth);
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_MEMBER) {
+        return codegen_resolve_member_type(ctx, node, type_out);
+    }
+
+    if (node->type == PARSER_NODE_SIZEOF) {
+        if (node->first_child) {
+            TypeDesc operand_type;
+
+            if (node->first_child->next) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected sizeof operand");
+            }
+
+            if (!codegen_expression_type(ctx, node->first_child,
+                    &operand_type)) {
+                return 0;
+            }
+            *type_out = codegen_int_type_desc();
+            return 1;
+        }
+
+        if (!codegen_require_struct(ctx->codegen, ctx->structs,
+                ctx->struct_count, node->type_token)) {
+            return 0;
+        }
+        *type_out = codegen_int_type_desc();
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_UNARY) {
+        const ParserNode *operand = node->first_child;
+        TypeDesc operand_type;
+
+        if (!operand || operand->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected unary operand");
+        }
+
+        if (token_is_punct(node->token, "&")) {
+            const GlobalSymbol *symbol = NULL;
+
+            if (operand->type != PARSER_NODE_IDENTIFIER) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected identifier address");
+            }
+
+            symbol = codegen_find_global(ctx, operand->token);
+            if (!symbol) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: unknown global");
+            }
+
+            *type_out = codegen_make_type_desc(symbol->type_token,
+                symbol->pointer_depth + 1);
+            return 1;
+        }
+
+        if (!codegen_expression_type(ctx, operand, &operand_type)) {
+            return 0;
+        }
+
+        if (token_is_punct(node->token, "!")) {
+            if (!codegen_type_is_integer(operand_type)
+                && operand_type.pointer_depth == 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected condition operand");
+            }
+
+            *type_out = codegen_int_type_desc();
+            return 1;
+        }
+
+        if (token_is_punct(node->token, "+")) {
+            if (!codegen_type_is_integer(operand_type)) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected integer operand");
+            }
+
+            *type_out = operand_type;
+            return 1;
+        }
+
+        if (token_is_punct(node->token, "-")) {
+            if (!codegen_type_is_integer(operand_type)) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected integer operand");
+            }
+
+            *type_out = codegen_int_type_desc();
+            return 1;
+        }
+
+        if (token_is_punct(node->token, "*")) {
+            if (operand_type.pointer_depth <= 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected pointer operand");
+            }
+
+            operand_type.pointer_depth--;
+            if (!codegen_require_struct(ctx->codegen, ctx->structs,
+                    ctx->struct_count, operand_type.type_token)) {
+                return 0;
+            }
+            *type_out = operand_type;
+            return 1;
+        }
+
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected unary operator");
+    }
+
+    if (node->type == PARSER_NODE_BINARY) {
+        const ParserNode *left = node->first_child;
+        const ParserNode *right = left ? left->next : NULL;
+        TypeDesc left_type;
+        TypeDesc right_type;
+
+        if (!left || !right || right->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected binary operands");
+        }
+
+        if (token_is_punct(node->token, "&&")
+            || token_is_punct(node->token, "||")) {
+            if (!codegen_expression_type(ctx, left, &left_type)) {
+                return 0;
+            }
+            if (!codegen_expression_type(ctx, right, &right_type)) {
+                return 0;
+            }
+            if (!codegen_type_is_integer(left_type)
+                && left_type.pointer_depth == 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected condition operand");
+            }
+            if (!codegen_type_is_integer(right_type)
+                && right_type.pointer_depth == 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected condition operand");
+            }
+            *type_out = codegen_int_type_desc();
+            return 1;
+        }
+
+        if (!codegen_expression_type(ctx, left, &left_type)) {
+            return 0;
+        }
+
+        if (!codegen_expression_type(ctx, right, &right_type)) {
+            return 0;
+        }
+
+        if (token_is_punct(node->token, "+")) {
+            if (left_type.pointer_depth > 0
+                && codegen_type_is_integer(right_type)) {
+                *type_out = left_type;
+                return 1;
+            }
+            if (right_type.pointer_depth > 0
+                && codegen_type_is_integer(left_type)) {
+                *type_out = right_type;
+                return 1;
+            }
+        } else if (token_is_punct(node->token, "-")) {
+            if (left_type.pointer_depth > 0
+                && codegen_type_is_integer(right_type)) {
+                *type_out = left_type;
+                return 1;
+            }
+        }
+
+        if (!codegen_type_is_integer(left_type)
+            || !codegen_type_is_integer(right_type)) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected integer operands");
+        }
+
+        *type_out = codegen_int_type_desc();
+        return 1;
+    }
+
+    return codegen_set_error(ctx->codegen,
+        "codegen: expected expression");
+}
+
 static int codegen_emit_expression(FunctionContext *ctx,
     const ParserNode *node,
     char *value,
@@ -942,6 +1400,33 @@ static int codegen_emit_expression(FunctionContext *ctx,
         }
 
         snprintf(value, value_size, "%ld", node->token.value);
+        *type_out = codegen_int_type_desc();
+        return 1;
+    }
+
+    if (node->type == PARSER_NODE_SIZEOF) {
+        TypeDesc target_type;
+
+        if (node->first_child) {
+            if (node->first_child->next) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected sizeof operand");
+            }
+
+            if (!codegen_expression_type(ctx, node->first_child,
+                    &target_type)) {
+                return 0;
+            }
+        } else {
+            target_type = codegen_make_type_desc(node->type_token,
+                node->pointer_depth);
+        }
+
+        if (!codegen_emit_sizeof_type(ctx, target_type, value,
+                value_size)) {
+            return 0;
+        }
+
         *type_out = codegen_int_type_desc();
         return 1;
     }

@@ -123,6 +123,10 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_RETURN, text, length);
     }
 
+    if (length == 6 && strncmp(text, "sizeof", 6) == 0) {
+        return make_token(TOKEN_SIZEOF, text, length);
+    }
+
     if (length == 4 && strncmp(text, "char", 4) == 0) {
         return make_token(TOKEN_CHAR, text, length);
     }

@@ -22,6 +22,7 @@ typedef enum ParserNodeType {
     PARSER_NODE_MEMBER,
     PARSER_NODE_BINARY,
     PARSER_NODE_UNARY,
+    PARSER_NODE_SIZEOF,
     PARSER_NODE_NUMBER,
     PARSER_NODE_INVALID
 } ParserNodeType;

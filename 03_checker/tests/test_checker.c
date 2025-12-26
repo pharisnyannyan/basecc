@@ -19,6 +19,7 @@
     X(check_parenthesized_arithmetic, "check parenthesized arithmetic") \
     X(check_nested_parentheses, "check nested parentheses") \
     X(check_unary_arithmetic, "check unary arithmetic") \
+    X(check_sizeof, "check sizeof") \
     X(check_logical_expression, "check logical expression") \
     X(check_break_outside_loop, "check break outside loop") \
     X(check_continue_outside_loop, "check continue outside loop") \
@@ -196,6 +197,19 @@ TEST(check_unary_arithmetic, "check unary arithmetic")
     Checker checker;
 
     checker_init(&checker, "int main(){return -(1 + 2) + +3;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_sizeof, "check sizeof")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){int value; return sizeof(value) + sizeof(int);}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

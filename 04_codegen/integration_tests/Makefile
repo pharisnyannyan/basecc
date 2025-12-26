@@ -1,4 +1,4 @@
-CC ?= cc
+CC ?= clang
 LL_CC ?= $(CC)
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2
 CPPFLAGS ?= -I../include -I../../03_checker/include -I../../02_parser/include \

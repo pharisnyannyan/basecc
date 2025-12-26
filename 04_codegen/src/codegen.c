@@ -725,7 +725,7 @@ static int codegen_resolve_member_type(FunctionContext *ctx,
     const ParserNode *field = base ? base->next : NULL;
     const StructSymbol *symbol = NULL;
     Token struct_token;
-    size_t field_index = 0;
+    
     int found = 0;
     int base_is_const = 0;
 
@@ -847,7 +847,7 @@ static int codegen_resolve_member_type(FunctionContext *ctx,
             found = 1;
             break;
         }
-        field_index++;
+        
     }
 
     if (!found) {

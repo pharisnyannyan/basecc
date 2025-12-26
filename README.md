@@ -4,109 +4,68 @@
 
 BaseCC is a minimal, BSD-style educational C compiler written in C. The primary goal is clarity and learnability. The compiler is designed to be read, understood, and extended step by step, with a long-term intent of becoming self-hosting.
 
-This repository is being built as a challenge using ChatGPT Codex.
+## Current Status
 
-## Project goal
-BaseCC is a **minimal, BSD-style educational C compiler written in C**. The primary goal is clarity and learnability. The compiler is designed to be read, understood, and extended step by step, with a long-term intent of becoming self-hosting.
+BaseCC has evolved from a minimal lexer/parser into a functional C compiler targeting LLVM IR. It now supports a significant subset of the C language, capable of compiling and running complex algorithms such as Linked Lists, Binary Search Trees, and various Sorting algorithms.
+
+### Supported Features
+- **Data Types**: `int`, `char`, pointers, fixed-size arrays.
+- **Compound Types**: `struct` (including self-referential pointers) and `typedef`.
+- **Control Flow**: `if`/`else`, `while`, `for`, `return`, `break`, `continue`.
+- **Operators**: 
+  - Arithmetic (`+`, `-`, `*`, `/`)
+  - Logical & Comparison (`!`, `==`, `!=`, `<`, `>`, etc.)
+  - Member Access (`.`, `->`)
+  - Pointer/Memory (`*`, `&`, `sizeof`, `cast`)
+- **Storage Classes**: `extern`, `static`, `const`.
+- **Functions**: Global function definitions, recursive calls, and external function calls.
+
+## Project Goal
 
 The project deliberately favors:
-- explicit control flow
-- simple data structures
-- boring, readable C
-- minimal tooling
+- **Explicit control flow**: No hidden magic or complex abstractions.
+- **Simple data structures**: Easy to reason about memory layout.
+- **Boring, readable C**: Follows BSD-leaning coding style.
+- **Minimal tooling**: Standard Makefiles and C11.
 
-## Intermediate representation and backends
-BaseCC targets **LLVM IR as the default intermediate representation**. This default keeps the compiler easy to inspect while enabling familiar tooling. The design must remain flexible:
-- The IR/backend layer should be swappable without rewriting front-end stages.
-- The compiler should be able to emit alternative IRs or custom machine code backends.
-- Direct emission of real machine code is a supported goal.
-- A custom VM instruction set is also a valid backend target.
+## Intermediate Representation and Backends
 
-In practice this means stages should clearly separate front-end analysis from IR emission and backend lowering, so additional backends can be introduced incrementally.
+BaseCC targets **LLVM IR as the default intermediate representation**. This keeps the compiler easy to inspect while enabling familiar tooling. The design is modular:
+- The IR/backend layer is separated from front-end stages.
+- Future goals include direct machine code emission and custom VM backends.
 
-## Core principles
-- BSD-leaning coding style: clear, disciplined, unsurprising C
-- No clever tricks, no macro-heavy abstractions
-- Each compiler stage is understandable in isolation
-- Simplicity beats generality
-- Educational value is more important than feature completeness
+## Repository Structure (Stage-based)
 
-## Repository structure (stage-based)
-The compiler is organized as **one directory per stage**. Each stage is responsible for a single transformation or concern.
+The compiler is organized as **one directory per stage**. Each stage is responsible for a single transformation:
 
-General rules:
-- Each stage lives in its own folder
-- Each stage can be built and tested independently
-- Stages are composed in order by higher-level drivers
+1.  **`01_lexer`**: Lexical analysis, converts source to tokens.
+2.  **`02_parser`**: Syntax analysis, builds the Abstract Syntax Tree (AST).
+3.  **`03_checker`**: Semantic analysis, performs type checking and name resolution.
+4.  **`04_codegen`**: LLVM IR generation.
 
-Each stage directory should contain:
-- `src/` — implementation
-- `include/` — headers (if needed)
-- `tests/` — unit tests for that stage
-- `README.md` — short explanation of what the stage does and its inputs/outputs
+Each stage directory contains:
+- `src/` — Implementation
+- `include/` — Headers
+- `tests/` — Unit tests for that stage
+- `README.md` — Stage-specific documentation
 
-## Testing requirements
-- **Every stage must have unit tests**
-- Tests must be small, explicit, and easy to inspect
-- Tests should validate behavior, not implementation details
+## Build and Testing
 
-### Minimal testing only
-Avoid complex or heavyweight frameworks.
+Building and testing are designed to be fast and simple.
 
-Allowed:
-- Minimal C test programs with simple `ASSERT`-style helpers
-- Shell scripts that run binaries and compare output
-- Small Python scripts (standard library only)
+### Prerequisites
+- LLVM/Clang (for code generation and running tests)
+- Standard Unix build tools (`make`)
 
-Tests should:
-- be runnable locally
-- fail loudly and clearly
-- return non-zero exit codes on failure
-
-## Test execution model
-Testing should be **fully automated**.
-
-Requirements:
-- One command at the repository root runs **all tests**
-- That same command is used by CI
-- No manual per-stage test invocation required for normal use
-
-Example approaches (choose one, keep it simple):
-- `make test`
-- `./test.sh`
-- `python tools/run_tests.py`
-
-The exact mechanism can evolve, but the interface should remain stable.
-
-## Build approach (minimal by design)
-The build system should stay intentionally simple.
-
-Guidelines:
-- Prefer plain `Makefile`s
-- Avoid build generators and meta-build systems
-- Each stage may have its own small `Makefile`
-- A top-level `Makefile` may orchestrate stage builds once multiple stages exist
-
-It is acceptable to:
-- define build rules incrementally as stages are added
-- keep early stages extremely simple (single binary, few objects)
-
-Do not over-design the build system upfront.
+### Commands
+- **Build all stages**: `make all`
+- **Run all tests**: `make test` (Includes unit tests for each stage and integration tests)
+- **Clean**: `make clean`
 
 ## Continuous Integration
-All tests must run in **GitHub Actions**.
 
-CI requirements:
-- Run on every push and pull request
-- Build the project using the same commands documented locally
-- Run the single top-level test command
-- Fail on any warning-worthy errors or test failures
-
-The README should include:
-- a CI status badge
-- a short note stating that CI runs the full test suite automatically
-
-CI runs the full test suite automatically on every push and pull request.
+CI runs the full test suite automatically on every push and pull request via GitHub Actions. All tests must pass, and the code must build without warnings.
 
 ## License
+
 BaseCC is released under the MIT License. See `LICENSE` for details.

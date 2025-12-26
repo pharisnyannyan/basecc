@@ -1,6 +1,0 @@
-add=7
-sub=8
-mul=42
-divide=5
-mod=2
-mixed=7

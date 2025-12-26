@@ -55,4 +55,5 @@ dkms.conf
 *.dwo
 
 # Build output
-01_lexer/build/
+build/
+**/build/

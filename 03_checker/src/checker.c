@@ -17,6 +17,9 @@ void checker_init(Checker *checker, const char *input)
     checker->error_message = NULL;
 }
 
+static int checker_validate_declaration(Checker *checker,
+    const ParserNode *node);
+
 static int checker_validate_number(Checker *checker, const ParserNode *node)
 {
     if (node->type != PARSER_NODE_NUMBER) {
@@ -93,11 +96,6 @@ static int checker_validate_expression(Checker *checker,
                 "checker: expected function identifier");
         }
 
-        if (node->first_child) {
-            return checker_set_error(checker,
-                "checker: arguments not supported");
-        }
-
         for (child = node->first_child; child; child = child->next) {
             if (!checker_validate_expression(checker, child)) {
                 return 0;
@@ -172,6 +170,8 @@ static int checker_validate_statement(Checker *checker,
             }
         }
         return 1;
+    case PARSER_NODE_DECLARATION:
+        return checker_validate_declaration(checker, node);
     case PARSER_NODE_IF: {
         const ParserNode *condition = node->first_child;
         const ParserNode *then_branch = condition ? condition->next : NULL;
@@ -200,6 +200,19 @@ static int checker_validate_statement(Checker *checker,
         }
 
         return 1;
+    }
+    case PARSER_NODE_ASSIGN: {
+        if (node->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected assignment identifier");
+        }
+
+        if (!node->first_child || node->first_child->next) {
+            return checker_set_error(checker,
+                "checker: expected assignment expression");
+        }
+
+        return checker_validate_expression(checker, node->first_child);
     }
     case PARSER_NODE_WHILE: {
         const ParserNode *condition = node->first_child;
@@ -266,6 +279,9 @@ static int checker_validate_declaration(Checker *checker,
 
 static int checker_validate_function(Checker *checker, const ParserNode *node)
 {
+    const ParserNode *child = NULL;
+    const ParserNode *body = NULL;
+
     if (node->type != PARSER_NODE_FUNCTION) {
         return checker_set_error(checker, "checker: expected function");
     }
@@ -274,16 +290,42 @@ static int checker_validate_function(Checker *checker, const ParserNode *node)
         return checker_set_error(checker, "checker: expected identifier");
     }
 
-    if (!node->first_child || node->first_child->next) {
+    if (!node->first_child) {
         return checker_set_error(checker, "checker: expected function body");
     }
 
-    if (node->first_child->type != PARSER_NODE_BLOCK) {
+    for (child = node->first_child; child; child = child->next) {
+        if (!child->next) {
+            body = child;
+            break;
+        }
+
+        if (child->type != PARSER_NODE_DECLARATION) {
+            return checker_set_error(checker,
+                "checker: expected parameter declaration");
+        }
+
+        if (child->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected parameter identifier");
+        }
+
+        if (child->first_child) {
+            return checker_set_error(checker,
+                "checker: unexpected parameter initializer");
+        }
+    }
+
+    if (!body) {
+        return checker_set_error(checker, "checker: expected function body");
+    }
+
+    if (body->type != PARSER_NODE_BLOCK) {
         return checker_set_error(checker,
             "checker: expected function block");
     }
 
-    return checker_validate_statement(checker, node->first_child);
+    return checker_validate_statement(checker, body);
 }
 
 static int checker_validate_translation_unit(Checker *checker,

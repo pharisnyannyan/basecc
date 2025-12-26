@@ -1,7 +1,7 @@
-int foo() {
-    return 7;
+int foo(int a, int b) {
+    return a + b;
 }
 
 int main() {
-    return foo();
+    return foo(3, 4);
 }

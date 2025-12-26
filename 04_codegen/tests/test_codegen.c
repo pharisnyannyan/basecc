@@ -22,8 +22,10 @@
     X(generate_arithmetic_function, "generate arithmetic function") \
     X(generate_logical_function, "generate logical operators") \
     X(generate_sizeof, "generate sizeof expressions") \
+    X(generate_sizeof_struct_custom, "generate sizeof for custom struct") \
     X(check_invalid_syntax, "reject invalid syntax") \
-    X(check_const_assignment, "reject const assignment")
+    X(check_const_assignment, "reject const assignment") \
+    X(check_const_field_assignment, "reject const field assignment")
 
 static char *read_file(const char *path, size_t *size_out)
 {
@@ -327,6 +329,17 @@ TEST(generate_sizeof, "generate sizeof expressions")
     return run_codegen_fixture(&fixture);
 }
 
+TEST(generate_sizeof_struct_custom, "generate sizeof for custom struct")
+{
+    CodegenFixture fixture = {
+        "codegen_sizeof_custom",
+        "tests/testdata/sizeof_struct_custom.c",
+        "tests/testdata/sizeof_struct_custom.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
 TEST(check_invalid_syntax, "reject invalid syntax")
 {
     Codegen codegen;
@@ -363,6 +376,28 @@ TEST(check_const_assignment, "reject const assignment")
     codegen_init(&codegen, source);
 
     ASSERT_TRUE(!codegen_emit(&codegen, "build/test_codegen_const.ll"),
+        "expected codegen failure");
+    ASSERT_TRUE(test_error_contains(codegen_error(&codegen), "const"),
+        "expected const assignment error");
+
+    free(source);
+    return 1;
+}
+
+TEST(check_const_field_assignment, "reject const field assignment")
+{
+    Codegen codegen;
+    char *source = NULL;
+
+    source = read_file("tests/testdata/const_struct_field_assignment.c", NULL);
+    if (!source) {
+        failf("expected fixture input");
+        return 0;
+    }
+
+    codegen_init(&codegen, source);
+
+    ASSERT_TRUE(!codegen_emit(&codegen, "build/test_codegen_const_field.ll"),
         "expected codegen failure");
     ASSERT_TRUE(test_error_contains(codegen_error(&codegen), "const"),
         "expected const assignment error");

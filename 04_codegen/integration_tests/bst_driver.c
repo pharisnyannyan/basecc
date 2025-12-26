@@ -1,9 +1,6 @@
-#include <stdio.h>
-
-int bst_search_sum();
+int bst_search_sum(void);
 
 int main(void)
 {
-    printf("%d\n", bst_search_sum());
-    return 0;
+    return bst_search_sum();
 }

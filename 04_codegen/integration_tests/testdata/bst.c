@@ -4,13 +4,49 @@ struct Node {
     struct Node *right;
 };
 
-struct Node node_a;
-struct Node node_b;
-struct Node node_c;
-struct Node node_d;
-struct Node node_e;
-struct Node node_f;
-struct Node node_g;
+extern void *malloc(unsigned long size);
+extern void free(void *ptr);
+extern long write(int fd, const void *buf, unsigned long count);
+
+static void write_text(const char *text, unsigned long length)
+{
+    write(1, text, length);
+}
+
+static struct Node *bst_insert(struct Node *root, int value)
+{
+    struct Node *node = 0;
+
+    if (!root) {
+        node = malloc(sizeof(struct Node));
+        if (!node) {
+            return 0;
+        }
+        node->value = value;
+        node->left = 0;
+        node->right = 0;
+        return node;
+    }
+
+    if (value < root->value) {
+        root->left = bst_insert(root->left, value);
+    } else if (value > root->value) {
+        root->right = bst_insert(root->right, value);
+    }
+
+    return root;
+}
+
+static void bst_free(struct Node *root)
+{
+    if (!root) {
+        return;
+    }
+
+    bst_free(root->left);
+    bst_free(root->right);
+    free(root);
+}
 
 struct Node *bst_find(struct Node *root, int value)
 {
@@ -36,36 +72,13 @@ struct Node *bst_build()
 {
     struct Node *root = 0;
 
-    node_a.value = 5;
-    node_b.value = 3;
-    node_c.value = 8;
-    node_d.value = 1;
-    node_e.value = 4;
-    node_f.value = 7;
-    node_g.value = 9;
-
-    node_a.left = 0;
-    node_a.right = 0;
-    node_b.left = 0;
-    node_b.right = 0;
-    node_c.left = 0;
-    node_c.right = 0;
-    node_d.left = 0;
-    node_d.right = 0;
-    node_e.left = 0;
-    node_e.right = 0;
-    node_f.left = 0;
-    node_f.right = 0;
-    node_g.left = 0;
-    node_g.right = 0;
-
-    root = &node_a;
-    node_a.left = &node_b;
-    node_a.right = &node_c;
-    node_b.left = &node_d;
-    node_b.right = &node_e;
-    node_c.left = &node_f;
-    node_c.right = &node_g;
+    root = bst_insert(root, 5);
+    root = bst_insert(root, 3);
+    root = bst_insert(root, 8);
+    root = bst_insert(root, 1);
+    root = bst_insert(root, 4);
+    root = bst_insert(root, 7);
+    root = bst_insert(root, 9);
 
     return root;
 }
@@ -73,23 +86,31 @@ struct Node *bst_build()
 int bst_search_sum()
 {
     struct Node *root = bst_build();
-    int total = 0;
 
     if (bst_find(root, 4)) {
-        total = total + 4;
+        write_text("found 4\n", 8);
+    } else {
+        write_text("missing 4\n", 10);
     }
 
     if (bst_find(root, 6)) {
-        total = total + 100;
+        write_text("found 6\n", 8);
+    } else {
+        write_text("missing 6\n", 10);
     }
 
     if (bst_find(root, 7)) {
-        total = total + 7;
+        write_text("found 7\n", 8);
+    } else {
+        write_text("missing 7\n", 10);
     }
 
     if (bst_find(root, 9)) {
-        total = total + 9;
+        write_text("found 9\n", 8);
+    } else {
+        write_text("missing 9\n", 10);
     }
 
-    return total;
+    bst_free(root);
+    return 0;
 }

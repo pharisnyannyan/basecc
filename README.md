@@ -1,6 +1,6 @@
 # BaseCC
 
-![CI](https://github.com/basecc/basecc/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/pharisnyannyan/basecc/actions/workflows/ci.yml/badge.svg)
 
 BaseCC is a minimal, BSD-style educational C compiler written in C. The primary goal is clarity and learnability. The compiler is designed to be read, understood, and extended step by step, with a long-term intent of becoming self-hosting.
 

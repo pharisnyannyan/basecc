@@ -121,6 +121,7 @@ static ParserNode *parser_parse_number(Parser *parser)
 
 static ParserNode *parser_parse_expression(Parser *parser);
 static ParserNode *parser_parse_unary(Parser *parser);
+static ParserNode *parser_parse_postfix(Parser *parser);
 static ParserNode *parser_parse_parameter(Parser *parser);
 static ParserNode *parser_parse_assignment_statement(Parser *parser);
 static ParserNode *parser_parse_assignment_expression(Parser *parser);
@@ -227,6 +228,52 @@ static ParserNode *parser_parse_primary(Parser *parser)
     return parser_make_error(parser, token, "parser: expected expression");
 }
 
+static ParserNode *parser_parse_postfix(Parser *parser)
+{
+    ParserNode *node = parser_parse_primary(parser);
+
+    if (!node || node->type == PARSER_NODE_INVALID) {
+        return node;
+    }
+
+    while (token_is_punct(parser->last_token, ".")
+        || token_is_punct(parser->last_token, "->")) {
+        Token op_token = parser->last_token;
+        Token field_token;
+        ParserNode *field = NULL;
+        ParserNode *member = NULL;
+
+        parser_next(parser);
+        field_token = parser->last_token;
+        if (field_token.type != TOKEN_IDENT) {
+            ParserNode *error_node = parser_make_error(parser, field_token,
+                "parser: expected field identifier");
+            parser_free_node(node);
+            return error_node;
+        }
+
+        parser_next(parser);
+        field = parser_alloc_node(parser, PARSER_NODE_IDENTIFIER, field_token);
+        if (!field) {
+            parser_free_node(node);
+            return NULL;
+        }
+
+        member = parser_alloc_node(parser, PARSER_NODE_MEMBER, op_token);
+        if (!member) {
+            parser_free_node(node);
+            parser_free_node(field);
+            return NULL;
+        }
+
+        member->first_child = node;
+        node->next = field;
+        node = member;
+    }
+
+    return node;
+}
+
 static ParserNode *parser_parse_unary(Parser *parser)
 {
     Token token = parser->last_token;
@@ -255,7 +302,7 @@ static ParserNode *parser_parse_unary(Parser *parser)
         return node;
     }
 
-    return parser_parse_primary(parser);
+    return parser_parse_postfix(parser);
 }
 
 static ParserNode *parser_parse_multiplicative(Parser *parser)

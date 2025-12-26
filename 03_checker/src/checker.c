@@ -120,6 +120,30 @@ static int checker_validate_expression(Checker *checker,
         return 1;
     }
 
+    if (node->type == PARSER_NODE_MEMBER) {
+        const ParserNode *base = node->first_child;
+        const ParserNode *field = base ? base->next : NULL;
+
+        if (!base || !field || field->next) {
+            return checker_set_error(checker,
+                "checker: expected member operands");
+        }
+
+        if (!token_is_punct(node->token, ".")
+            && !token_is_punct(node->token, "->")) {
+            return checker_set_error(checker,
+                "checker: expected member operator");
+        }
+
+        if (field->type != PARSER_NODE_IDENTIFIER
+            || field->token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected member identifier");
+        }
+
+        return checker_validate_expression(checker, base);
+    }
+
     if (node->type == PARSER_NODE_UNARY) {
         const ParserNode *operand = node->first_child;
 
@@ -180,6 +204,14 @@ static int checker_validate_assignment(Checker *checker,
         }
 
         if (!checker_validate_expression(checker, left->first_child)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, right);
+    }
+
+    if (left->type == PARSER_NODE_MEMBER) {
+        if (!checker_validate_expression(checker, left)) {
             return 0;
         }
 

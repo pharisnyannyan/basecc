@@ -855,6 +855,12 @@ static int codegen_emit_expression(FunctionContext *ctx,
         const ParserNode *right = left ? left->next : NULL;
         char left_value[32];
         char right_value[32];
+        char pointer_value[32];
+        char offset_value[32];
+        char element_type_name[32];
+        char pointer_type_name[32];
+        TypeDesc pointer_type;
+        TypeDesc element_type;
         const char *opcode = NULL;
         TypeDesc left_type;
         TypeDesc right_type;
@@ -884,15 +890,87 @@ static int codegen_emit_expression(FunctionContext *ctx,
             return 0;
         }
 
-        if (!codegen_type_is_integer(left_type)
-            || !codegen_type_is_integer(right_type)) {
-            return codegen_set_error(ctx->codegen,
-                "codegen: expected integer operands");
-        }
-
         if (token_is_punct(node->token, "+")) {
+            if (left_type.pointer_depth > 0
+                && codegen_type_is_integer(right_type)) {
+                pointer_type = left_type;
+                element_type = left_type;
+                element_type.pointer_depth--;
+                codegen_format_desc_type(element_type, element_type_name,
+                    sizeof(element_type_name));
+                codegen_format_desc_type(pointer_type, pointer_type_name,
+                    sizeof(pointer_type_name));
+                snprintf(pointer_value, sizeof(pointer_value), "%s",
+                    left_value);
+                snprintf(offset_value, sizeof(offset_value), "%s",
+                    right_value);
+                snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+                fprintf(ctx->out,
+                    "  %s = getelementptr %s, %s %s, i32 %s\n",
+                    value,
+                    element_type_name,
+                    pointer_type_name,
+                    pointer_value,
+                    offset_value);
+                *type_out = pointer_type;
+                return 1;
+            }
+            if (right_type.pointer_depth > 0
+                && codegen_type_is_integer(left_type)) {
+                pointer_type = right_type;
+                element_type = right_type;
+                element_type.pointer_depth--;
+                codegen_format_desc_type(element_type, element_type_name,
+                    sizeof(element_type_name));
+                codegen_format_desc_type(pointer_type, pointer_type_name,
+                    sizeof(pointer_type_name));
+                snprintf(pointer_value, sizeof(pointer_value), "%s",
+                    right_value);
+                snprintf(offset_value, sizeof(offset_value), "%s",
+                    left_value);
+                snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+                fprintf(ctx->out,
+                    "  %s = getelementptr %s, %s %s, i32 %s\n",
+                    value,
+                    element_type_name,
+                    pointer_type_name,
+                    pointer_value,
+                    offset_value);
+                *type_out = pointer_type;
+                return 1;
+            }
             opcode = "add";
         } else if (token_is_punct(node->token, "-")) {
+            if (left_type.pointer_depth > 0
+                && codegen_type_is_integer(right_type)) {
+                char neg_value[32];
+
+                pointer_type = left_type;
+                element_type = left_type;
+                element_type.pointer_depth--;
+                codegen_format_desc_type(element_type, element_type_name,
+                    sizeof(element_type_name));
+                codegen_format_desc_type(pointer_type, pointer_type_name,
+                    sizeof(pointer_type_name));
+                snprintf(pointer_value, sizeof(pointer_value), "%s",
+                    left_value);
+                snprintf(neg_value, sizeof(neg_value), "%%t%d",
+                    ctx->next_temp_id++);
+                fprintf(ctx->out, "  %s = sub i32 0, %s\n",
+                    neg_value, right_value);
+                snprintf(offset_value, sizeof(offset_value), "%s",
+                    neg_value);
+                snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+                fprintf(ctx->out,
+                    "  %s = getelementptr %s, %s %s, i32 %s\n",
+                    value,
+                    element_type_name,
+                    pointer_type_name,
+                    pointer_value,
+                    offset_value);
+                *type_out = pointer_type;
+                return 1;
+            }
             opcode = "sub";
         } else if (token_is_punct(node->token, "*")) {
             opcode = "mul";
@@ -903,6 +981,12 @@ static int codegen_emit_expression(FunctionContext *ctx,
         } else {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected binary operator");
+        }
+
+        if (!codegen_type_is_integer(left_type)
+            || !codegen_type_is_integer(right_type)) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected integer operands");
         }
 
         snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);

@@ -11,6 +11,7 @@
     X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_array_declaration, "parse array declaration") \
     X(parse_typedefs_and_const, "parse typedefs and const") \
+    X(parse_static_declarations, "parse static declarations") \
     X(parse_struct_definition, "parse struct definition") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_for_loop, "parse for loop") \
@@ -263,6 +264,56 @@ TEST(parse_typedefs_and_const, "parse typedefs and const")
         "expected const base type");
     ASSERT_TRUE(child->pointer_depth == 1, "expected pointer depth");
     ASSERT_TRUE(child->is_const, "expected const qualifier");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_static_declarations, "parse static declarations")
+{
+    Parser parser;
+    ParserNode *body = NULL;
+
+    parser_init(&parser,
+        "static int global;"
+        "const static char *ptr;"
+        "int main(){static short local=2; static int *p=&global; return 0;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+    ASSERT_TRUE(node->first_child != NULL, "expected first declaration");
+    ASSERT_TRUE(node->first_child->is_static, "expected static global");
+    ASSERT_TRUE(node->first_child->type_token.type == TOKEN_INT,
+        "expected int global");
+    ASSERT_TRUE(node->first_child->next != NULL, "expected second declaration");
+    ASSERT_TRUE(node->first_child->next->is_static, "expected static pointer");
+    ASSERT_TRUE(node->first_child->next->is_const, "expected const pointer");
+    ASSERT_TRUE(node->first_child->next->pointer_depth == 1,
+        "expected pointer depth");
+    ASSERT_TRUE(node->first_child->next->type_token.type == TOKEN_CHAR,
+        "expected char pointer");
+    ASSERT_TRUE(node->first_child->next->next != NULL,
+        "expected function node");
+    ASSERT_TRUE(node->first_child->next->next->type == PARSER_NODE_FUNCTION,
+        "expected function node");
+    body = node->first_child->next->next->first_child;
+    ASSERT_TRUE(body != NULL, "expected function body");
+    ASSERT_TRUE(body->type == PARSER_NODE_BLOCK, "expected block node");
+    ASSERT_TRUE(body->first_child != NULL,
+        "expected first local declaration");
+    ASSERT_TRUE(body->first_child->is_static,
+        "expected static local");
+    ASSERT_TRUE(body->first_child->type_token.type == TOKEN_SHORT,
+        "expected short local");
+    ASSERT_TRUE(body->first_child->next != NULL,
+        "expected second local declaration");
+    ASSERT_TRUE(body->first_child->next->is_static,
+        "expected static local pointer");
+    ASSERT_TRUE(body->first_child->next->pointer_depth == 1,
+        "expected pointer depth");
 
     parser_free_node(node);
     return 1;

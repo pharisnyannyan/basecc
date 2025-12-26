@@ -10,6 +10,7 @@
     X(check_pointer_support, "check pointer support") \
     X(check_array_support, "check array support") \
     X(check_typedef_const_cast, "check typedef const cast") \
+    X(check_static_declarations, "check static declarations") \
     X(check_struct_definition, "check struct definition") \
     X(check_function_control_flow, "check function control flow") \
     X(check_for_loop, "check for loop") \
@@ -91,6 +92,21 @@ TEST(check_typedef_const_cast, "check typedef const cast")
         "typedef const int *ConstIntPtr;"
         "int main(){int value=0; void *ptr=&value;"
         "ConstIntPtr c=(ConstIntPtr)ptr; return (int)ptr;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_static_declarations, "check static declarations")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "static int global;"
+        "const static char *ptr;"
+        "int main(){static short local=2; static int *p=&global; return 0;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

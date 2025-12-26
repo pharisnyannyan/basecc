@@ -13,6 +13,8 @@ typedef struct TypeSpec {
     Token type_token;
     int pointer_depth;
     int is_const;
+    int is_extern;
+    int is_static;
 } TypeSpec;
 
 void parser_init(Parser *parser, const char *input)
@@ -45,6 +47,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
     node->pointer_depth = 0;
     node->is_const = 0;
     node->is_extern = 0;
+    node->is_static = 0;
     node->array_length = 0;
     node->first_child = NULL;
     node->next = NULL;
@@ -156,17 +159,47 @@ static Token parser_make_struct_type_token(Token name_token);
 
 static int parser_parse_type_spec(Parser *parser,
     TypeSpec *spec,
+    int allow_storage,
     ParserNode **error_out)
 {
     Token token = parser->last_token;
     Token type_token;
     int pointer_depth = 0;
     int is_const = 0;
+    int is_extern = 0;
+    int is_static = 0;
 
-    while (token.type == TOKEN_CONST) {
-        is_const = 1;
-        parser_next(parser);
-        token = parser->last_token;
+    for (;;) {
+        if (token.type == TOKEN_CONST) {
+            is_const = 1;
+            parser_next(parser);
+            token = parser->last_token;
+            continue;
+        }
+
+        if (token.type == TOKEN_EXTERN || token.type == TOKEN_STATIC) {
+            if (!allow_storage) {
+                *error_out = parser_make_error(parser, token,
+                    "parser: unexpected storage class specifier");
+                return 0;
+            }
+            if (token.type == TOKEN_EXTERN) {
+                is_extern = 1;
+            } else {
+                is_static = 1;
+            }
+            parser_next(parser);
+            token = parser->last_token;
+            continue;
+        }
+
+        break;
+    }
+
+    if (is_extern && is_static) {
+        *error_out = parser_make_error(parser, token,
+            "parser: conflicting storage class specifiers");
+        return 0;
     }
 
     if (token.type == TOKEN_STRUCT) {
@@ -204,12 +237,18 @@ static int parser_parse_type_spec(Parser *parser,
     spec->type_token = type_token;
     spec->pointer_depth = pointer_depth;
     spec->is_const = is_const;
+    spec->is_extern = is_extern;
+    spec->is_static = is_static;
     return 1;
 }
 
 static int parser_is_type_start(const Parser *parser, Token token)
 {
     if (token.type == TOKEN_CONST) {
+        return 1;
+    }
+
+    if (token.type == TOKEN_STATIC) {
         return 1;
     }
 
@@ -524,7 +563,7 @@ static ParserNode *parser_parse_unary(Parser *parser)
             ParserNode *error_node = NULL;
 
             if (parser_is_type_start(parser, parser->last_token)) {
-                if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+                if (!parser_parse_type_spec(parser, &spec, 0, &error_node)) {
                     return error_node;
                 }
 
@@ -586,7 +625,7 @@ static ParserNode *parser_parse_unary(Parser *parser)
 
         parser_next(parser);
         if (parser_is_type_start(parser, parser->last_token)) {
-            if (parser_parse_type_spec(parser, &spec, &error_node)
+            if (parser_parse_type_spec(parser, &spec, 0, &error_node)
                 && parser_match_punct(parser, ")")) {
                 ParserNode *operand = parser_parse_unary(parser);
                 ParserNode *node = NULL;
@@ -961,7 +1000,7 @@ static ParserNode *parser_parse_for(Parser *parser)
 
     if (parser_match_punct(parser, ";")) {
         init = parser_alloc_node(parser, PARSER_NODE_EMPTY, token);
-    } else if (token_is_type(parser->last_token)) {
+    } else if (parser_is_type_start(parser, parser->last_token)) {
         init = parser_parse_local_declaration(parser);
     } else if (parser->last_token.type == TOKEN_IDENT
         || token_is_punct(parser->last_token, "*")) {
@@ -1238,8 +1277,13 @@ static ParserNode *parser_parse_typedef(Parser *parser)
 
     parser_next(parser);
 
-    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+    if (!parser_parse_type_spec(parser, &spec, 1, &error_node)) {
         return error_node;
+    }
+
+    if (spec.is_extern) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: extern not allowed for local declaration");
     }
 
     name_token = parser->last_token;
@@ -1341,8 +1385,13 @@ static ParserNode *parser_parse_struct_field(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+    if (!parser_parse_type_spec(parser, &spec, 1, &error_node)) {
         return error_node;
+    }
+
+    if (spec.is_extern) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: extern not allowed for local declaration");
     }
 
     token = parser->last_token;
@@ -1433,8 +1482,13 @@ static ParserNode *parser_parse_local_declaration(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+    if (!parser_parse_type_spec(parser, &spec, 1, &error_node)) {
         return error_node;
+    }
+
+    if (spec.is_extern) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: extern not allowed for local declaration");
     }
 
     token = parser->last_token;
@@ -1453,6 +1507,7 @@ static ParserNode *parser_parse_local_declaration(Parser *parser)
     if (declaration && declaration->type != PARSER_NODE_INVALID) {
         declaration->pointer_depth = spec.pointer_depth;
         declaration->is_const = spec.is_const;
+        declaration->is_static = spec.is_static;
     }
 
     return declaration;
@@ -1469,7 +1524,7 @@ static ParserNode *parser_parse_parameter(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+    if (!parser_parse_type_spec(parser, &spec, 0, &error_node)) {
         return error_node;
     }
 
@@ -1600,7 +1655,6 @@ static ParserNode *parser_parse_external(Parser *parser)
     Token token = parser->last_token;
     TypeSpec spec;
     ParserNode *error_node = NULL;
-    int is_extern = 0;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
@@ -1608,12 +1662,6 @@ static ParserNode *parser_parse_external(Parser *parser)
 
     if (token.type == TOKEN_TYPEDEF) {
         return parser_parse_typedef(parser);
-    }
-
-    if (token.type == TOKEN_EXTERN) {
-        is_extern = 1;
-        parser_next(parser);
-        token = parser->last_token;
     }
 
     if (token.type == TOKEN_STRUCT) {
@@ -1635,7 +1683,7 @@ static ParserNode *parser_parse_external(Parser *parser)
         parser_restore(parser, snapshot);
     }
 
-    if (!parser_parse_type_spec(parser, &spec, &error_node)) {
+    if (!parser_parse_type_spec(parser, &spec, 1, &error_node)) {
         return error_node;
     }
 
@@ -1652,11 +1700,12 @@ static ParserNode *parser_parse_external(Parser *parser)
 
     if (token_is_punct(parser->last_token, "(")) {
         ParserNode *function = parser_parse_function(parser, token,
-            spec.type_token, is_extern);
+            spec.type_token, spec.is_extern);
         if (function && function->type != PARSER_NODE_INVALID) {
             function->pointer_depth = spec.pointer_depth;
             function->is_const = spec.is_const;
-            function->is_extern = is_extern;
+            function->is_extern = spec.is_extern;
+            function->is_static = spec.is_static;
         }
         return function;
     }
@@ -1666,7 +1715,8 @@ static ParserNode *parser_parse_external(Parser *parser)
     if (declaration && declaration->type != PARSER_NODE_INVALID) {
         declaration->pointer_depth = spec.pointer_depth;
         declaration->is_const = spec.is_const;
-        declaration->is_extern = is_extern;
+        declaration->is_extern = spec.is_extern;
+        declaration->is_static = spec.is_static;
     }
     return declaration;
 }

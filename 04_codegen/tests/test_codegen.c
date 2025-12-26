@@ -11,6 +11,7 @@
     X(generate_simple_module, "generate simple module") \
     X(generate_type_declarations, "generate type declarations") \
     X(generate_defaults, "generate default initializers") \
+    X(generate_static_storage, "generate static storage") \
     X(generate_pointer_globals, "generate pointer globals") \
     X(generate_array_ops, "generate array operations") \
     X(generate_pointer_return, "generate pointer return") \
@@ -204,6 +205,17 @@ TEST(generate_defaults, "generate default initializers")
         "codegen_defaults",
         "tests/testdata/defaults.c",
         "tests/testdata/defaults.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_static_storage, "generate static storage")
+{
+    CodegenFixture fixture = {
+        "codegen_static_storage",
+        "tests/testdata/static_storage.c",
+        "tests/testdata/static_storage.ll"
     };
 
     return run_codegen_fixture(&fixture);

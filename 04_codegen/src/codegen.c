@@ -14,6 +14,7 @@ typedef struct FunctionContext {
     int return_pointer_depth;
     Token return_type_token;
     int return_is_const;
+    Token function_name;
     const struct GlobalSymbol *globals;
     size_t global_count;
     const struct StructSymbol *structs;
@@ -32,6 +33,7 @@ typedef struct FunctionContext {
     struct LoopContext *loop_stack;
     size_t loop_depth;
     size_t loop_capacity;
+    size_t static_local_index;
 } FunctionContext;
 
 typedef struct LoopContext {
@@ -83,7 +85,7 @@ typedef struct LocalSymbol {
     int pointer_depth;
     int is_const;
     size_t array_length;
-    char ir_name[32];
+    char ir_name[128];
 } LocalSymbol;
 
 typedef struct TypedefSymbol {
@@ -92,6 +94,19 @@ typedef struct TypedefSymbol {
     TypeDesc type;
     int scope_depth;
 } TypedefSymbol;
+
+typedef struct StaticLocalContext {
+    Codegen *codegen;
+    FILE *out;
+    Token function_name;
+    const GlobalSymbol *globals;
+    size_t global_count;
+    const StructSymbol *structs;
+    size_t struct_count;
+    const TypedefSymbol *typedefs;
+    size_t typedef_count;
+    size_t index;
+} StaticLocalContext;
 
 static int codegen_set_error(Codegen *codegen, const char *message);
 
@@ -555,7 +570,7 @@ static int codegen_emit_member_pointer(FunctionContext *ctx,
     Token struct_token;
     size_t field_index = 0;
     int found = 0;
-    char base_value[32];
+    char base_value[128];
     char struct_type[32];
     int base_is_const = 0;
 
@@ -879,7 +894,7 @@ static int codegen_emit_index_pointer(FunctionContext *ctx,
 {
     const ParserNode *base = node->first_child;
     const ParserNode *index = base ? base->next : NULL;
-    char base_value[32];
+    char base_value[128];
     char index_value[32];
     char element_type_name[32];
     char pointer_type_name[32];
@@ -1246,6 +1261,7 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
     long value = 0;
     char type_name[32];
     char init_value[64];
+    const char *linkage = "";
     TypeDesc declared_type;
     TypeDesc resolved_type;
 
@@ -1267,6 +1283,9 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
     }
 
     codegen_format_desc_type(resolved_type, type_name, sizeof(type_name));
+    if (node->is_static) {
+        linkage = "internal ";
+    }
 
     if (node->array_length > 0) {
         char array_type[64];
@@ -1278,9 +1297,10 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
 
         codegen_format_array_type(resolved_type, node->array_length,
             array_type, sizeof(array_type));
-        fprintf(out, "@%.*s = global %s zeroinitializer\n",
+        fprintf(out, "@%.*s = %sglobal %s zeroinitializer\n",
             (int)node->token.length,
             node->token.start,
+            linkage,
             array_type);
         return 1;
     }
@@ -1372,13 +1392,227 @@ static int codegen_emit_declaration(Codegen *codegen, const ParserNode *node,
         snprintf(init_value, sizeof(init_value), "0");
     }
 
-    fprintf(out, "@%.*s = global %s %s\n",
+    fprintf(out, "@%.*s = %sglobal %s %s\n",
         (int)node->token.length,
         node->token.start,
+        linkage,
         type_name,
         init_value);
 
     return 1;
+}
+
+static void codegen_format_static_local_name(char *buffer, size_t size,
+    Token function_name, size_t index, Token local_name)
+{
+    snprintf(buffer, size, "@.static.%.*s.%zu.%.*s",
+        (int)function_name.length,
+        function_name.start,
+        index,
+        (int)local_name.length,
+        local_name.start);
+}
+
+static int codegen_emit_static_local(StaticLocalContext *ctx,
+    const ParserNode *node,
+    const char *name)
+{
+    long value = 0;
+    char type_name[32];
+    char init_value[64];
+    TypeDesc declared_type;
+    TypeDesc resolved_type;
+
+    if (node->type != PARSER_NODE_DECLARATION) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected declaration node");
+    }
+
+    if (node->token.type != TOKEN_IDENT) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected identifier token");
+    }
+
+    declared_type = codegen_make_type_desc(node->type_token,
+        node->pointer_depth, node->is_const);
+    if (!codegen_require_type(ctx->codegen, ctx->structs, ctx->struct_count,
+            ctx->typedefs, ctx->typedef_count, declared_type, &resolved_type)) {
+        return 0;
+    }
+
+    codegen_format_desc_type(resolved_type, type_name, sizeof(type_name));
+
+    if (node->array_length > 0) {
+        char array_type[64];
+
+        if (node->first_child) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: array initializer not supported");
+        }
+
+        codegen_format_array_type(resolved_type, node->array_length,
+            array_type, sizeof(array_type));
+        fprintf(ctx->out, "%s = internal global %s zeroinitializer\n",
+            name,
+            array_type);
+        return 1;
+    }
+
+    if (node->first_child) {
+        const ParserNode *init = node->first_child;
+
+        if (node->first_child->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unexpected initializer list");
+        }
+
+        if (resolved_type.type_token.type == TOKEN_STRUCT
+            && resolved_type.pointer_depth == 0) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: struct initializer not supported");
+        }
+
+        if (resolved_type.pointer_depth == 0) {
+            if (init->type != PARSER_NODE_NUMBER) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected number initializer");
+            }
+
+            value = init->token.value;
+            snprintf(init_value, sizeof(init_value), "%ld", value);
+        } else if (init->type == PARSER_NODE_NUMBER) {
+            if (init->token.value != 0) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected null pointer initializer");
+            }
+            snprintf(init_value, sizeof(init_value), "null");
+        } else if (init->type == PARSER_NODE_UNARY
+            && token_is_punct(init->token, "&")) {
+            const ParserNode *operand = init->first_child;
+            const GlobalSymbol *symbol = NULL;
+            TypeDesc symbol_desc;
+            TypeDesc resolved_symbol;
+
+            if (!operand || operand->next) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected address-of operand");
+            }
+
+            if (operand->type != PARSER_NODE_IDENTIFIER) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected identifier address");
+            }
+
+            symbol = NULL;
+            for (size_t i = 0; i < ctx->global_count; i++) {
+                if (codegen_name_matches(operand->token,
+                        ctx->globals[i].name,
+                        ctx->globals[i].length)) {
+                    symbol = &ctx->globals[i];
+                    break;
+                }
+            }
+
+            if (!symbol) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: unknown global initializer");
+            }
+
+            symbol_desc = codegen_make_type_desc(symbol->type_token,
+                symbol->pointer_depth, symbol->is_const);
+            if (!codegen_resolve_desc(ctx->codegen, ctx->typedefs,
+                    ctx->typedef_count, symbol_desc, &resolved_symbol)) {
+                return 0;
+            }
+            resolved_symbol.pointer_depth += 1;
+            if (!codegen_pointer_compatible(resolved_type, resolved_symbol)) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: initializer type mismatch");
+            }
+
+            snprintf(init_value, sizeof(init_value), "@%.*s",
+                (int)operand->token.length,
+                operand->token.start);
+        } else {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unsupported initializer");
+        }
+    } else if (resolved_type.pointer_depth > 0) {
+        snprintf(init_value, sizeof(init_value), "null");
+    } else if (resolved_type.type_token.type == TOKEN_STRUCT) {
+        snprintf(init_value, sizeof(init_value), "zeroinitializer");
+    } else {
+        snprintf(init_value, sizeof(init_value), "0");
+    }
+
+    fprintf(ctx->out, "%s = internal global %s %s\n",
+        name,
+        type_name,
+        init_value);
+
+    return 1;
+}
+
+static int codegen_emit_static_locals_in_statement(StaticLocalContext *ctx,
+    const ParserNode *node)
+{
+    const ParserNode *child = NULL;
+
+    if (!node) {
+        return 1;
+    }
+
+    switch (node->type) {
+    case PARSER_NODE_DECLARATION:
+        if (node->is_static) {
+            char name[128];
+
+            codegen_format_static_local_name(name, sizeof(name),
+                ctx->function_name, ctx->index, node->token);
+            ctx->index++;
+            return codegen_emit_static_local(ctx, node, name);
+        }
+        return 1;
+    case PARSER_NODE_BLOCK:
+        for (child = node->first_child; child; child = child->next) {
+            if (!codegen_emit_static_locals_in_statement(ctx, child)) {
+                return 0;
+            }
+        }
+        return 1;
+    case PARSER_NODE_IF: {
+        const ParserNode *condition = node->first_child;
+        const ParserNode *then_branch = condition ? condition->next : NULL;
+        const ParserNode *else_branch = then_branch ? then_branch->next : NULL;
+
+        if (!codegen_emit_static_locals_in_statement(ctx, then_branch)) {
+            return 0;
+        }
+        if (!codegen_emit_static_locals_in_statement(ctx, else_branch)) {
+            return 0;
+        }
+        return 1;
+    }
+    case PARSER_NODE_WHILE: {
+        const ParserNode *condition = node->first_child;
+        const ParserNode *body = condition ? condition->next : NULL;
+
+        return codegen_emit_static_locals_in_statement(ctx, body);
+    }
+    case PARSER_NODE_FOR: {
+        const ParserNode *init = node->first_child;
+        const ParserNode *condition = init ? init->next : NULL;
+        const ParserNode *increment = condition ? condition->next : NULL;
+        const ParserNode *body = increment ? increment->next : NULL;
+
+        if (!codegen_emit_static_locals_in_statement(ctx, init)) {
+            return 0;
+        }
+        return codegen_emit_static_locals_in_statement(ctx, body);
+    }
+    default:
+        return 1;
+    }
 }
 
 static int codegen_emit_expression(FunctionContext *ctx,
@@ -2742,6 +2976,16 @@ static int codegen_emit_local_declaration(FunctionContext *ctx,
     local->pointer_depth = resolved_type.pointer_depth;
     local->is_const = resolved_type.is_const;
 
+    if (node->is_static) {
+        char static_name[128];
+
+        codegen_format_static_local_name(static_name, sizeof(static_name),
+            ctx->function_name, ctx->static_local_index, node->token);
+        ctx->static_local_index++;
+        snprintf(local->ir_name, sizeof(local->ir_name), "%s", static_name);
+        return 1;
+    }
+
     if (node->array_length > 0) {
         char array_type[64];
 
@@ -3579,18 +3823,19 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
         }
 
         ctx.return_pointer_depth = resolved_return.pointer_depth;
-        ctx.return_type_token = resolved_return.type_token;
-        ctx.return_is_const = resolved_return.is_const;
-        type_info = codegen_type_info(resolved_return.type_token);
-        codegen_format_desc_type(resolved_return, ctx.return_type,
-            sizeof(ctx.return_type));
-    }
+    ctx.return_type_token = resolved_return.type_token;
+    ctx.return_is_const = resolved_return.is_const;
+    type_info = codegen_type_info(resolved_return.type_token);
+    codegen_format_desc_type(resolved_return, ctx.return_type,
+        sizeof(ctx.return_type));
+}
 
     ctx.codegen = codegen;
     ctx.out = out;
     ctx.next_label_id = 0;
     ctx.next_temp_id = 0;
     ctx.return_width = type_info.width;
+    ctx.function_name = node->token;
     ctx.globals = globals;
     ctx.global_count = global_count;
     ctx.structs = structs;
@@ -3609,6 +3854,7 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     ctx.loop_stack = NULL;
     ctx.loop_depth = 0;
     ctx.loop_capacity = 0;
+    ctx.static_local_index = 0;
 
     if (typedef_count > 0) {
         ctx.typedefs = malloc(typedef_count * sizeof(*ctx.typedefs));
@@ -3620,7 +3866,32 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
         ctx.typedef_capacity = typedef_count;
     }
 
-    fprintf(out, "define %s @%.*s(",
+    if (body) {
+        StaticLocalContext static_ctx = {
+            .codegen = codegen,
+            .out = out,
+            .function_name = node->token,
+            .globals = globals,
+            .global_count = global_count,
+            .structs = structs,
+            .struct_count = struct_count,
+            .typedefs = typedefs,
+            .typedef_count = typedef_count,
+            .index = 0
+        };
+
+        if (!codegen_emit_static_locals_in_statement(&static_ctx, body)) {
+            free(ctx.typedefs);
+            return 0;
+        }
+
+        if (static_ctx.index > 0) {
+            fprintf(out, "\n");
+        }
+    }
+
+    fprintf(out, "define%s %s @%.*s(",
+        node->is_static ? " internal" : "",
         ctx.return_type,
         (int)node->token.length,
         node->token.start);

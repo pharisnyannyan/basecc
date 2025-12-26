@@ -178,6 +178,43 @@ static int codegen_integer_width(TypeDesc desc)
     return info.width;
 }
 
+static int codegen_emit_condition_bool(FunctionContext *ctx,
+    TypeDesc condition_type,
+    const char *condition_value,
+    char *bool_value,
+    size_t bool_size)
+{
+    if (codegen_type_is_integer(condition_type)) {
+        snprintf(bool_value, bool_size, "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n",
+            bool_value,
+            condition_value);
+        return 1;
+    }
+
+    if (condition_type.pointer_depth > 0) {
+        char type_name[32];
+
+        codegen_format_desc_type(condition_type, type_name, sizeof(type_name));
+        snprintf(bool_value, bool_size, "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = icmp ne %s %s, null\n",
+            bool_value,
+            type_name,
+            condition_value);
+        return 1;
+    }
+
+    return codegen_set_error(ctx->codegen,
+        "codegen: expected condition value");
+}
+
+static int codegen_is_null_pointer_literal(const ParserNode *node)
+{
+    return node->type == PARSER_NODE_NUMBER
+        && node->token.type == TOKEN_NUMBER
+        && node->token.value == 0;
+}
+
 static int codegen_emit_integer_cast(FunctionContext *ctx,
     TypeDesc from,
     TypeDesc to,
@@ -226,6 +263,23 @@ static int codegen_require_struct(Codegen *codegen,
     const StructSymbol *structs,
     size_t struct_count,
     Token type_token);
+static const StructSymbol *codegen_find_struct(const StructSymbol *structs,
+    size_t struct_count,
+    Token name_token);
+static const GlobalSymbol *codegen_find_global(const FunctionContext *ctx,
+    Token name);
+static const LocalSymbol *codegen_find_local(const FunctionContext *ctx,
+    Token name);
+static int codegen_emit_expression(FunctionContext *ctx,
+    const ParserNode *node,
+    char *value,
+    size_t value_size,
+    TypeDesc *type_out);
+static int codegen_emit_member_pointer(FunctionContext *ctx,
+    const ParserNode *node,
+    char *pointer_value,
+    size_t pointer_size,
+    TypeDesc *field_type_out);
 
 static int codegen_emit_struct_definition(Codegen *codegen,
     const StructSymbol *symbol,
@@ -330,6 +384,123 @@ static int codegen_require_struct(Codegen *codegen,
         return codegen_set_error(codegen, "codegen: unknown struct type");
     }
 
+    return 1;
+}
+
+static int codegen_emit_member_pointer(FunctionContext *ctx,
+    const ParserNode *node,
+    char *pointer_value,
+    size_t pointer_size,
+    TypeDesc *field_type_out)
+{
+    const ParserNode *base = node->first_child;
+    const ParserNode *field = base ? base->next : NULL;
+    const StructSymbol *symbol = NULL;
+    Token struct_token;
+    size_t field_index = 0;
+    int found = 0;
+    char base_value[32];
+    char struct_type[32];
+
+    if (!base || !field || field->next) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member access operands");
+    }
+
+    if (field->type != PARSER_NODE_IDENTIFIER
+        || field->token.type != TOKEN_IDENT) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member field identifier");
+    }
+
+    if (token_is_punct(node->token, ".")) {
+        const LocalSymbol *local = codegen_find_local(ctx, base->token);
+        const GlobalSymbol *global = NULL;
+
+        if (base->type != PARSER_NODE_IDENTIFIER) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected struct identifier");
+        }
+
+        if (local) {
+            if (local->pointer_depth != 0
+                || local->type_token.type != TOKEN_STRUCT) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected struct value");
+            }
+            snprintf(base_value, sizeof(base_value), "%s", local->ir_name);
+            struct_token = local->type_token;
+        } else {
+            global = codegen_find_global(ctx, base->token);
+            if (!global) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: unknown struct identifier");
+            }
+
+            if (global->pointer_depth != 0
+                || global->type_token.type != TOKEN_STRUCT) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected struct value");
+            }
+            snprintf(base_value, sizeof(base_value), "@%.*s",
+                (int)base->token.length,
+                base->token.start);
+            struct_token = global->type_token;
+        }
+    } else if (token_is_punct(node->token, "->")) {
+        TypeDesc base_type;
+
+        if (!codegen_emit_expression(ctx, base, base_value,
+                sizeof(base_value), &base_type)) {
+            return 0;
+        }
+
+        if (base_type.pointer_depth != 1
+            || base_type.type_token.type != TOKEN_STRUCT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected struct pointer");
+        }
+        struct_token = base_type.type_token;
+    } else {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected member access operator");
+    }
+
+    symbol = codegen_find_struct(ctx->structs, ctx->struct_count,
+        struct_token);
+    if (!symbol) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unknown struct type");
+    }
+
+    for (const ParserNode *field_node = symbol->fields;
+        field_node;
+        field_node = field_node->next) {
+        if (codegen_name_matches(field->token,
+                field_node->token.start,
+                field_node->token.length)) {
+            *field_type_out = codegen_make_type_desc(field_node->type_token,
+                field_node->pointer_depth);
+            found = 1;
+            break;
+        }
+        field_index++;
+    }
+
+    if (!found) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unknown struct field");
+    }
+
+    codegen_format_type(struct_token, 0, struct_type, sizeof(struct_type));
+    snprintf(pointer_value, pointer_size, "%%t%d", ctx->next_temp_id++);
+    fprintf(ctx->out,
+        "  %s = getelementptr inbounds %s, %s* %s, i32 0, i32 %zu\n",
+        pointer_value,
+        struct_type,
+        struct_type,
+        base_value,
+        field_index);
     return 1;
 }
 
@@ -698,13 +869,10 @@ static int codegen_emit_logical_binary(FunctionContext *ctx,
         return 0;
     }
 
-    if (!codegen_type_is_integer(left_type)) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected integer logical operand");
+    if (!codegen_emit_condition_bool(ctx, left_type, left_value, left_bool,
+            sizeof(left_bool))) {
+        return 0;
     }
-
-    snprintf(left_bool, sizeof(left_bool), "%%t%d", ctx->next_temp_id++);
-    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", left_bool, left_value);
 
     if (is_and) {
         fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
@@ -724,13 +892,10 @@ static int codegen_emit_logical_binary(FunctionContext *ctx,
         return 0;
     }
 
-    if (!codegen_type_is_integer(right_type)) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected integer logical operand");
+    if (!codegen_emit_condition_bool(ctx, right_type, right_value, right_bool,
+            sizeof(right_bool))) {
+        return 0;
     }
-
-    snprintf(right_bool, sizeof(right_bool), "%%t%d", ctx->next_temp_id++);
-    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", right_bool, right_value);
     fprintf(ctx->out, "  br label %%%s\n", end_label);
 
     fprintf(ctx->out, "%s:\n", end_label);
@@ -840,7 +1005,11 @@ static int codegen_emit_expression(FunctionContext *ctx,
                 param->pointer_depth);
 
             if (param_type.pointer_depth > 0) {
-                if (arg_type.pointer_depth != param_type.pointer_depth
+                if (arg_type.pointer_depth == 0
+                    && codegen_is_null_pointer_literal(arg)) {
+                    snprintf(arg_values[index], sizeof(arg_values[index]),
+                        "null");
+                } else if (arg_type.pointer_depth != param_type.pointer_depth
                     || !codegen_type_token_equals(arg_type.type_token,
                         param_type.type_token)) {
                     free(arg_values);
@@ -996,6 +1165,37 @@ static int codegen_emit_expression(FunctionContext *ctx,
         return 1;
     }
 
+    if (node->type == PARSER_NODE_MEMBER) {
+        char member_pointer[32];
+        char value_type[32];
+        char pointer_type[32];
+        TypeDesc field_type;
+
+        if (!codegen_emit_member_pointer(ctx, node, member_pointer,
+                sizeof(member_pointer), &field_type)) {
+            return 0;
+        }
+
+        if (field_type.pointer_depth == 0
+            && field_type.type_token.type == TOKEN_STRUCT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: struct value not supported");
+        }
+
+        codegen_format_desc_type(field_type, value_type, sizeof(value_type));
+        codegen_format_type(field_type.type_token,
+            field_type.pointer_depth + 1, pointer_type, sizeof(pointer_type));
+
+        snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+        fprintf(ctx->out, "  %s = load %s, %s %s\n",
+            value,
+            value_type,
+            pointer_type,
+            member_pointer);
+        *type_out = field_type;
+        return 1;
+    }
+
     if (node->type == PARSER_NODE_UNARY) {
         const ParserNode *operand = node->first_child;
         char operand_value[32];
@@ -1036,14 +1236,22 @@ static int codegen_emit_expression(FunctionContext *ctx,
         }
 
         if (token_is_punct(node->token, "!")) {
-            if (!codegen_type_is_integer(operand_type)) {
-                return codegen_set_error(ctx->codegen,
-                    "codegen: expected integer operand");
-            }
-
             snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
-            fprintf(ctx->out, "  %s = icmp eq i32 %s, 0\n", temp,
-                operand_value);
+            if (codegen_type_is_integer(operand_type)) {
+                fprintf(ctx->out, "  %s = icmp eq i32 %s, 0\n", temp,
+                    operand_value);
+            } else if (operand_type.pointer_depth > 0) {
+                char type_name[32];
+
+                codegen_format_desc_type(operand_type, type_name,
+                    sizeof(type_name));
+                fprintf(ctx->out, "  %s = icmp eq %s %s, null\n", temp,
+                    type_name,
+                    operand_value);
+            } else {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected condition operand");
+            }
 
             snprintf(result, sizeof(result), "%%t%d", ctx->next_temp_id++);
             fprintf(ctx->out, "  %s = zext i1 %s to i32\n", result, temp);
@@ -1316,7 +1524,10 @@ static int codegen_emit_local_declaration(FunctionContext *ctx,
     }
 
     if (node->pointer_depth > 0) {
-        if (init_type.pointer_depth != node->pointer_depth
+        if (init_type.pointer_depth == 0
+            && codegen_is_null_pointer_literal(node->first_child)) {
+            snprintf(init_value, sizeof(init_value), "null");
+        } else if (init_type.pointer_depth != node->pointer_depth
             || !codegen_type_token_equals(init_type.type_token,
                 node->type_token)) {
             return codegen_set_error(ctx->codegen,
@@ -1407,12 +1618,10 @@ static int codegen_emit_if(FunctionContext *ctx, const ParserNode *node)
         return 0;
     }
 
-    if (!codegen_type_is_integer(condition_type)) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected integer condition");
+    if (!codegen_emit_condition_bool(ctx, condition_type, value, temp,
+            sizeof(temp))) {
+        return 0;
     }
-
-    snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
     codegen_format_label(then_label, sizeof(then_label), "if.then",
         ctx->next_label_id++);
 
@@ -1428,7 +1637,6 @@ static int codegen_emit_if(FunctionContext *ctx, const ParserNode *node)
         else_label[sizeof(else_label) - 1] = '\0';
     }
 
-    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
     fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
         temp,
         then_label,
@@ -1503,13 +1711,10 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
         return 0;
     }
 
-    if (!codegen_type_is_integer(condition_type)) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected integer condition");
+    if (!codegen_emit_condition_bool(ctx, condition_type, value, temp,
+            sizeof(temp))) {
+        return 0;
     }
-
-    snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
-    fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
     fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
         temp,
         body_label,
@@ -1585,13 +1790,10 @@ static int codegen_emit_for(FunctionContext *ctx, const ParserNode *node)
             return 0;
         }
 
-        if (!codegen_type_is_integer(condition_type)) {
-            return codegen_set_error(ctx->codegen,
-                "codegen: expected integer condition");
+        if (!codegen_emit_condition_bool(ctx, condition_type, value, temp,
+                sizeof(temp))) {
+            return 0;
         }
-
-        snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
-        fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
         fprintf(ctx->out, "  br i1 %s, label %%%s, label %%%s\n",
             temp,
             body_label,
@@ -1687,7 +1889,10 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                 sizeof(type_name));
 
             if (target_type.pointer_depth > 0) {
-                if (expr_type.pointer_depth != target_type.pointer_depth
+                if (expr_type.pointer_depth == 0
+                    && codegen_is_null_pointer_literal(right)) {
+                    snprintf(value, sizeof(value), "null");
+                } else if (expr_type.pointer_depth != target_type.pointer_depth
                     || !codegen_type_token_equals(expr_type.type_token,
                         target_type.type_token)) {
                     return codegen_set_error(ctx->codegen,
@@ -1713,6 +1918,59 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             return 0;
         }
 
+        if (left->type == PARSER_NODE_MEMBER) {
+            char member_pointer[32];
+            TypeDesc target_type;
+
+            if (!codegen_emit_member_pointer(ctx, left, member_pointer,
+                    sizeof(member_pointer), &target_type)) {
+                return 0;
+            }
+
+            if (target_type.pointer_depth == 0
+                && target_type.type_token.type == TOKEN_STRUCT) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: struct value not supported");
+            }
+
+            if (!codegen_emit_expression(ctx, right, value,
+                    sizeof(value), &expr_type)) {
+                return 0;
+            }
+
+            codegen_format_desc_type(target_type, type_name,
+                sizeof(type_name));
+
+            if (target_type.pointer_depth > 0) {
+                if (expr_type.pointer_depth == 0
+                    && codegen_is_null_pointer_literal(right)) {
+                    snprintf(value, sizeof(value), "null");
+                } else if (expr_type.pointer_depth != target_type.pointer_depth
+                    || !codegen_type_token_equals(expr_type.type_token,
+                        target_type.type_token)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: assignment type mismatch");
+                }
+            } else {
+                if (!codegen_type_is_integer(expr_type)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: expected integer assignment");
+                }
+
+                if (!codegen_emit_integer_cast(ctx, expr_type, target_type,
+                        value, sizeof(value))) {
+                    return 0;
+                }
+            }
+
+            fprintf(ctx->out, "  store %s %s, %s* %s\n",
+                type_name,
+                value,
+                type_name,
+                member_pointer);
+            return 0;
+        }
+
         if (left->type != PARSER_NODE_IDENTIFIER) {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected assignment target");
@@ -1729,7 +1987,10 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
                 type_name, sizeof(type_name));
 
             if (local->pointer_depth > 0) {
-                if (expr_type.pointer_depth != local->pointer_depth
+                if (expr_type.pointer_depth == 0
+                    && codegen_is_null_pointer_literal(right)) {
+                    snprintf(value, sizeof(value), "null");
+                } else if (expr_type.pointer_depth != local->pointer_depth
                     || !codegen_type_token_equals(expr_type.type_token,
                         local->type_token)) {
                     return codegen_set_error(ctx->codegen,
@@ -1776,7 +2037,10 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
             type_name, sizeof(type_name));
 
         if (global->pointer_depth > 0) {
-            if (expr_type.pointer_depth != global->pointer_depth
+            if (expr_type.pointer_depth == 0
+                && codegen_is_null_pointer_literal(right)) {
+                snprintf(value, sizeof(value), "null");
+            } else if (expr_type.pointer_depth != global->pointer_depth
                 || !codegen_type_token_equals(expr_type.type_token,
                     global->type_token)) {
                 return codegen_set_error(ctx->codegen,
@@ -1845,7 +2109,10 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
         }
 
         if (ctx->return_pointer_depth > 0) {
-            if (expr_type.pointer_depth != ctx->return_pointer_depth
+            if (expr_type.pointer_depth == 0
+                && codegen_is_null_pointer_literal(node->first_child)) {
+                snprintf(value, sizeof(value), "null");
+            } else if (expr_type.pointer_depth != ctx->return_pointer_depth
                 || !codegen_type_token_equals(expr_type.type_token,
                     ctx->return_type_token)) {
                 return codegen_set_error(ctx->codegen,

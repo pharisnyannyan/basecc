@@ -152,6 +152,11 @@ static Token lex_punctuator(Lexer *lexer)
         return make_token(TOKEN_PUNCT, lexer->input + start, 2);
     }
 
+    if (ch == '-' && lexer->input[lexer->pos + 1] == '>') {
+        lexer->pos += 2;
+        return make_token(TOKEN_PUNCT, lexer->input + start, 2);
+    }
+
     if (ch == '&' && lexer->input[lexer->pos + 1] == '&') {
         lexer->pos += 2;
         return make_token(TOKEN_PUNCT, lexer->input + start, 2);
@@ -179,7 +184,7 @@ static Token lex_punctuator(Lexer *lexer)
 
     if (ch == '+' || ch == '-' || ch == '*' || ch == '/' || ch == '('
         || ch == '%' || ch == ')' || ch == '{' || ch == '}' || ch == ';'
-        || ch == ',' || ch == '=') {
+        || ch == ',' || ch == '=' || ch == '.') {
         lexer->pos++;
         return make_token(TOKEN_PUNCT, lexer->input + start, 1);
     }

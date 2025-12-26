@@ -252,7 +252,7 @@ TEST(keywords, "keywords")
     Lexer lexer;
     Token token;
     lexer_init(&lexer,
-        "if else while for switch case break continue return sizeof char short int struct iffy");
+        "if else while for switch case break continue return sizeof typedef void const char short int struct iffy");
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_IF, "if");
@@ -283,6 +283,15 @@ TEST(keywords, "keywords")
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_SIZEOF, "sizeof");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_TYPEDEF, "typedef");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_VOID, "void");
+
+    token = lexer_next(&lexer);
+    ASSERT_KEYWORD_TOKEN(token, TOKEN_CONST, "const");
 
     token = lexer_next(&lexer);
     ASSERT_KEYWORD_TOKEN(token, TOKEN_CHAR, "char");

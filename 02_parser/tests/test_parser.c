@@ -9,6 +9,7 @@
     X(parse_translation_unit, "parse translation unit") \
     X(parse_type_declarations, "parse type declarations") \
     X(parse_pointer_declaration, "parse pointer declaration") \
+    X(parse_typedefs_and_const, "parse typedefs and const") \
     X(parse_struct_definition, "parse struct definition") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_for_loop, "parse for loop") \
@@ -20,6 +21,7 @@
     X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
     X(parse_nested_parentheses, "parse nested parentheses") \
     X(parse_unary_arithmetic, "parse unary arithmetic") \
+    X(parse_cast_expression, "parse cast expression") \
     X(parse_sizeof, "parse sizeof") \
     X(parse_logical_expression, "parse logical expression") \
     X(parse_invalid_token, "parse invalid token") \
@@ -141,6 +143,74 @@ TEST(parse_pointer_declaration, "parse pointer declaration")
     ASSERT_TRUE(expr->first_child != NULL, "expected dereference operand");
     ASSERT_TRUE(expr->first_child->type == PARSER_NODE_IDENTIFIER,
         "expected identifier operand");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_typedefs_and_const, "parse typedefs and const")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "typedef const int *ConstIntPtr;"
+        "typedef void *VoidPtr;"
+        "ConstIntPtr value;"
+        "VoidPtr data;"
+        "const int *ptr;");
+
+    ParserNode *node = parser_parse(&parser);
+    ParserNode *child = NULL;
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+
+    child = node->first_child;
+    ASSERT_TRUE(child != NULL, "expected typedef node");
+    ASSERT_TRUE(child->type == PARSER_NODE_TYPEDEF, "expected typedef node");
+    ASSERT_TRUE(token_equals(child->token, "ConstIntPtr"),
+        "expected typedef name");
+    ASSERT_TRUE(child->type_token.type == TOKEN_INT,
+        "expected typedef base type");
+    ASSERT_TRUE(child->pointer_depth == 1, "expected typedef pointer depth");
+    ASSERT_TRUE(child->is_const, "expected typedef const");
+
+    child = child->next;
+    ASSERT_TRUE(child != NULL, "expected second typedef node");
+    ASSERT_TRUE(child->type == PARSER_NODE_TYPEDEF, "expected typedef node");
+    ASSERT_TRUE(token_equals(child->token, "VoidPtr"),
+        "expected typedef name");
+    ASSERT_TRUE(child->type_token.type == TOKEN_VOID,
+        "expected typedef void base type");
+    ASSERT_TRUE(child->pointer_depth == 1, "expected typedef pointer depth");
+
+    child = child->next;
+    ASSERT_TRUE(child != NULL, "expected typedef declaration");
+    ASSERT_TRUE(child->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(child->type_token.type == TOKEN_IDENT,
+        "expected typedef identifier type");
+    ASSERT_TRUE(token_equals(child->type_token, "ConstIntPtr"),
+        "expected typedef identifier");
+
+    child = child->next;
+    ASSERT_TRUE(child != NULL, "expected void pointer declaration");
+    ASSERT_TRUE(child->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(child->type_token.type == TOKEN_IDENT,
+        "expected typedef identifier type");
+    ASSERT_TRUE(token_equals(child->type_token, "VoidPtr"),
+        "expected typedef identifier");
+
+    child = child->next;
+    ASSERT_TRUE(child != NULL, "expected const declaration");
+    ASSERT_TRUE(child->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(child->type_token.type == TOKEN_INT,
+        "expected const base type");
+    ASSERT_TRUE(child->pointer_depth == 1, "expected pointer depth");
+    ASSERT_TRUE(child->is_const, "expected const qualifier");
 
     parser_free_node(node);
     return 1;
@@ -683,6 +753,38 @@ TEST(parse_unary_arithmetic, "parse unary arithmetic")
     ASSERT_TRUE(right->first_child != NULL, "expected unary operand");
     ASSERT_TRUE(right->first_child->type == PARSER_NODE_NUMBER,
         "expected number expression");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_cast_expression, "parse cast expression")
+{
+    Parser parser;
+    ParserNode *expr = NULL;
+    ParserNode *body = NULL;
+    ParserNode *ret_stmt = NULL;
+
+    parser_init(&parser, "int main(){int value=0; return (int)value;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+
+    body = node->first_child->first_child;
+    ASSERT_TRUE(body != NULL, "expected function body");
+    ASSERT_TRUE(body->type == PARSER_NODE_BLOCK, "expected block");
+    ret_stmt = body->first_child ? body->first_child->next : NULL;
+    ASSERT_TRUE(ret_stmt != NULL, "expected return statement");
+    ASSERT_TRUE(ret_stmt->type == PARSER_NODE_RETURN,
+        "expected return statement");
+    expr = ret_stmt->first_child;
+    ASSERT_TRUE(expr != NULL, "expected return expression");
+    ASSERT_TRUE(expr->type == PARSER_NODE_CAST, "expected cast expression");
+    ASSERT_TRUE(expr->type_token.type == TOKEN_INT,
+        "expected cast type");
 
     parser_free_node(node);
     return 1;

@@ -20,6 +20,7 @@ void checker_init(Checker *checker, const char *input)
 
 static int checker_validate_declaration(Checker *checker,
     const ParserNode *node);
+static int checker_validate_typedef(Checker *checker, const ParserNode *node);
 
 static int checker_validate_number(Checker *checker, const ParserNode *node)
 {
@@ -159,6 +160,27 @@ static int checker_validate_expression(Checker *checker,
         return checker_validate_expression(checker, operand);
     }
 
+    if (node->type == PARSER_NODE_CAST) {
+        const ParserNode *operand = node->first_child;
+
+        if (!operand || operand->next) {
+            return checker_set_error(checker,
+                "checker: expected cast operand");
+        }
+
+        if (node->type_token.type != TOKEN_CHAR
+            && node->type_token.type != TOKEN_SHORT
+            && node->type_token.type != TOKEN_INT
+            && node->type_token.type != TOKEN_VOID
+            && node->type_token.type != TOKEN_STRUCT
+            && node->type_token.type != TOKEN_IDENT) {
+            return checker_set_error(checker,
+                "checker: expected cast type");
+        }
+
+        return checker_validate_expression(checker, operand);
+    }
+
     if (node->type == PARSER_NODE_SIZEOF) {
         const ParserNode *operand = node->first_child;
 
@@ -171,7 +193,9 @@ static int checker_validate_expression(Checker *checker,
             if (node->type_token.type != TOKEN_CHAR
                 && node->type_token.type != TOKEN_SHORT
                 && node->type_token.type != TOKEN_INT
-                && node->type_token.type != TOKEN_STRUCT) {
+                && node->type_token.type != TOKEN_VOID
+                && node->type_token.type != TOKEN_STRUCT
+                && node->type_token.type != TOKEN_IDENT) {
                 return checker_set_error(checker,
                     "checker: expected sizeof type");
             }
@@ -260,6 +284,8 @@ static int checker_validate_statement(Checker *checker,
         return 1;
     case PARSER_NODE_DECLARATION:
         return checker_validate_declaration(checker, node);
+    case PARSER_NODE_TYPEDEF:
+        return checker_validate_typedef(checker, node);
     case PARSER_NODE_IF: {
         const ParserNode *condition = node->first_child;
         const ParserNode *then_branch = condition ? condition->next : NULL;
@@ -426,6 +452,24 @@ static int checker_validate_declaration(Checker *checker,
     return 1;
 }
 
+static int checker_validate_typedef(Checker *checker, const ParserNode *node)
+{
+    if (node->type != PARSER_NODE_TYPEDEF) {
+        return checker_set_error(checker, "checker: expected typedef");
+    }
+
+    if (node->token.type != TOKEN_IDENT) {
+        return checker_set_error(checker, "checker: expected identifier");
+    }
+
+    if (node->first_child) {
+        return checker_set_error(checker,
+            "checker: unexpected typedef initializer");
+    }
+
+    return 1;
+}
+
 static int checker_validate_struct_definition(Checker *checker,
     const ParserNode *node)
 {
@@ -528,6 +572,13 @@ static int checker_validate_translation_unit(Checker *checker,
     for (child = node->first_child; child; child = child->next) {
         if (child->type == PARSER_NODE_DECLARATION) {
             if (!checker_validate_declaration(checker, child)) {
+                return 0;
+            }
+            continue;
+        }
+
+        if (child->type == PARSER_NODE_TYPEDEF) {
+            if (!checker_validate_typedef(checker, child)) {
                 return 0;
             }
             continue;

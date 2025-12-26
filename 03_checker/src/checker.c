@@ -160,17 +160,33 @@ static int checker_validate_expression(Checker *checker,
 static int checker_validate_assignment(Checker *checker,
     const ParserNode *node)
 {
-    if (node->token.type != TOKEN_IDENT) {
-        return checker_set_error(checker,
-            "checker: expected assignment identifier");
-    }
+    const ParserNode *left = node->first_child;
+    const ParserNode *right = left ? left->next : NULL;
 
-    if (!node->first_child || node->first_child->next) {
+    if (!left || !right || right->next) {
         return checker_set_error(checker,
             "checker: expected assignment expression");
     }
 
-    return checker_validate_expression(checker, node->first_child);
+    if (left->type == PARSER_NODE_IDENTIFIER) {
+        return checker_validate_expression(checker, right);
+    }
+
+    if (left->type == PARSER_NODE_UNARY && token_is_punct(left->token, "*")) {
+        if (!left->first_child || left->first_child->next) {
+            return checker_set_error(checker,
+                "checker: expected assignment target");
+        }
+
+        if (!checker_validate_expression(checker, left->first_child)) {
+            return 0;
+        }
+
+        return checker_validate_expression(checker, right);
+    }
+
+    return checker_set_error(checker,
+        "checker: expected assignment target");
 }
 
 static int checker_validate_statement(Checker *checker,

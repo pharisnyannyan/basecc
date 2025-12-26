@@ -12,6 +12,7 @@
     X(check_for_loop, "check for loop") \
     X(check_function_call, "check function call") \
     X(check_assignment_statement, "check assignment statement") \
+    X(check_dereference_assignment, "check dereference assignment") \
     X(check_binary_expression, "check binary expression") \
     X(check_parenthesized_arithmetic, "check parenthesized arithmetic") \
     X(check_nested_parentheses, "check nested parentheses") \
@@ -102,6 +103,19 @@ TEST(check_assignment_statement, "check assignment statement")
     Checker checker;
 
     checker_init(&checker, "int main(){int a=0; a = a + 1; return a;}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_dereference_assignment, "check dereference assignment")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

@@ -17,6 +17,9 @@ FOR_EXPECTED := for_loop_driver_expected.txt
 SWAP_LL := ../build/codegen_swap.ll
 SWAP_INPUT := testdata/swap.c
 SWAP_EXPECTED := swap_driver_expected.txt
+DOUBLE_PTR_LL := ../build/codegen_double_pointer.ll
+DOUBLE_PTR_INPUT := testdata/double_pointer.c
+DOUBLE_PTR_EXPECTED := double_pointer_driver_expected.txt
 FILL_LL := ../build/codegen_fill_array.ll
 FILL_INPUT := testdata/fill_array.c
 FILL_EXPECTED := fill_array_driver_expected.txt
@@ -87,6 +90,10 @@ SWAP_OBJ := $(BUILD_DIR)/swap.o
 SWAP_BIN := $(BUILD_DIR)/swap_driver
 SWAP_DRIVER := swap_driver.c
 SWAP_OUTPUT := $(BUILD_DIR)/swap_output.txt
+DOUBLE_PTR_OBJ := $(BUILD_DIR)/double_pointer.o
+DOUBLE_PTR_BIN := $(BUILD_DIR)/double_pointer_driver
+DOUBLE_PTR_DRIVER := double_pointer_driver.c
+DOUBLE_PTR_OUTPUT := $(BUILD_DIR)/double_pointer_output.txt
 FILL_OBJ := $(BUILD_DIR)/fill_array.o
 FILL_BIN := $(BUILD_DIR)/fill_array_driver
 FILL_DRIVER := fill_array_driver.c
@@ -151,13 +158,13 @@ EXTERN_IO_ERR_OUTPUT := $(BUILD_DIR)/extern_io_error.txt
 
 .PHONY: all compile generate run verify clean
 
-all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) \
+all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(DOUBLE_PTR_BIN) $(FILL_BIN) \
 	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN) $(HEAP_SORT_BIN) \
 	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN) \
 	$(BST_BIN) $(SIEVE_BIN) $(GCD_BIN) $(CONV_BIN) \
 	$(STRUCT_BIN) $(STRUCT_LIST_BIN) $(EXTERN_BIN) $(EXTERN_IO_BIN)
 
-generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) \
+generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(DOUBLE_PTR_LL) $(FILL_LL) \
 	$(QUICK_SORT_LL) $(MERGE_SORT_LL) $(HEAP_SORT_LL) \
 	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL) \
 	$(BST_LL) $(SIEVE_LL) $(GCD_LL) $(CONV_LL) \
@@ -174,6 +181,9 @@ $(FOR_LL): $(CODEGEN_BIN) $(FOR_INPUT)
 
 $(SWAP_LL): $(CODEGEN_BIN) $(SWAP_INPUT)
 	./$(CODEGEN_BIN) $(SWAP_INPUT) $(SWAP_LL)
+
+$(DOUBLE_PTR_LL): $(CODEGEN_BIN) $(DOUBLE_PTR_INPUT)
+	./$(CODEGEN_BIN) $(DOUBLE_PTR_INPUT) $(DOUBLE_PTR_LL)
 
 $(FILL_LL): $(CODEGEN_BIN) $(FILL_INPUT)
 	./$(CODEGEN_BIN) $(FILL_INPUT) $(FILL_LL)
@@ -220,13 +230,15 @@ $(EXTERN_LL): $(CODEGEN_BIN) $(EXTERN_INPUT)
 $(EXTERN_IO_LL): $(CODEGEN_BIN) $(EXTERN_IO_INPUT)
 	./$(CODEGEN_BIN) $(EXTERN_IO_INPUT) $(EXTERN_IO_LL)
 
-compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ) \
+compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(DOUBLE_PTR_OBJ) \
+	$(FILL_OBJ) \
 	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ) $(HEAP_SORT_OBJ) \
 	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ) \
 	$(BST_OBJ) $(SIEVE_OBJ) $(GCD_OBJ) $(CONV_OBJ) \
 	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ) $(EXTERN_OBJ) $(EXTERN_IO_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
+	$(DOUBLE_PTR_OUTPUT) \
 	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT) $(MERGE_SORT_OUTPUT) \
 	$(HEAP_SORT_OUTPUT) $(REVERSE_STRING_OUTPUT) $(LOOP_CONTROL_OUTPUT) \
 	$(PRIMES_OUTPUT) $(BST_OUTPUT) $(SIEVE_OUTPUT) $(GCD_OUTPUT) \
@@ -238,6 +250,7 @@ verify: run
 	cmp -s $(FIB_OUTPUT) $(FIB_EXPECTED)
 	cmp -s $(FOR_OUTPUT) $(FOR_EXPECTED)
 	cmp -s $(SWAP_OUTPUT) $(SWAP_EXPECTED)
+	cmp -s $(DOUBLE_PTR_OUTPUT) $(DOUBLE_PTR_EXPECTED)
 	cmp -s $(FILL_OUTPUT) $(FILL_EXPECTED)
 	cmp -s $(QUICK_SORT_OUTPUT) $(QUICK_SORT_EXPECTED)
 	cmp -s $(MERGE_SORT_OUTPUT) $(MERGE_SORT_EXPECTED)
@@ -274,6 +287,9 @@ $(FOR_OBJ): $(FOR_LL) | $(BUILD_DIR)
 
 $(SWAP_OBJ): $(SWAP_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(SWAP_LL) -o $(SWAP_OBJ)
+
+$(DOUBLE_PTR_OBJ): $(DOUBLE_PTR_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(DOUBLE_PTR_LL) -o $(DOUBLE_PTR_OBJ)
 
 $(FILL_OBJ): $(FILL_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(FILL_LL) -o $(FILL_OBJ)
@@ -331,6 +347,10 @@ $(FOR_BIN): $(FOR_OBJ) $(FOR_DRIVER)
 
 $(SWAP_BIN): $(SWAP_OBJ) $(SWAP_DRIVER)
 	$(CC) $(CFLAGS) -o $(SWAP_BIN) $(SWAP_DRIVER) $(SWAP_OBJ)
+
+$(DOUBLE_PTR_BIN): $(DOUBLE_PTR_OBJ) $(DOUBLE_PTR_DRIVER)
+	$(CC) $(CFLAGS) -o $(DOUBLE_PTR_BIN) $(DOUBLE_PTR_DRIVER) \
+		$(DOUBLE_PTR_OBJ)
 
 $(FILL_BIN): $(FILL_OBJ) $(FILL_DRIVER)
 	$(CC) $(CFLAGS) -o $(FILL_BIN) $(FILL_DRIVER) $(FILL_OBJ)
@@ -394,6 +414,9 @@ $(FOR_OUTPUT): $(FOR_BIN)
 
 $(SWAP_OUTPUT): $(SWAP_BIN)
 	./$(SWAP_BIN) > $(SWAP_OUTPUT)
+
+$(DOUBLE_PTR_OUTPUT): $(DOUBLE_PTR_BIN)
+	./$(DOUBLE_PTR_BIN) > $(DOUBLE_PTR_OUTPUT)
 
 $(FILL_OUTPUT): $(FILL_BIN)
 	./$(FILL_BIN) > $(FILL_OUTPUT)

@@ -11,6 +11,7 @@
     X(parse_pointer_declaration, "parse pointer declaration") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_function_call, "parse function call") \
+    X(parse_assignment_statement, "parse assignment statement") \
     X(parse_binary_expression, "parse binary expression") \
     X(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") \
     X(parse_nested_parentheses, "parse nested parentheses") \
@@ -179,7 +180,8 @@ TEST(parse_function_call, "parse function call")
 {
     Parser parser;
 
-    parser_init(&parser, "int foo(){return 1;} int main(){return foo();}");
+    parser_init(&parser,
+        "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
 
     ParserNode *node = parser_parse(&parser);
     ASSERT_TRUE(node != NULL, "expected parser node");
@@ -209,6 +211,54 @@ TEST(parse_function_call, "parse function call")
         node->first_child->next->first_child->first_child->first_child->token,
         "foo"),
         "expected call to 'foo'");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        ->first_child != NULL,
+        "expected call arguments");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        ->first_child->type == PARSER_NODE_NUMBER,
+        "expected first argument");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        ->first_child->next != NULL,
+        "expected second argument");
+    ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
+        ->first_child->next->type == PARSER_NODE_NUMBER,
+        "expected second argument");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_assignment_statement, "parse assignment statement")
+{
+    Parser parser;
+
+    parser_init(&parser, "int main(){int a=0; a = a + 1; return a;}");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->first_child != NULL, "expected function");
+    ASSERT_TRUE(node->first_child->first_child != NULL,
+        "expected function body");
+
+    ParserNode *stmt = node->first_child->first_child->first_child;
+    ASSERT_TRUE(stmt != NULL, "expected declaration statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_DECLARATION,
+        "expected declaration statement");
+
+    stmt = stmt->next;
+    ASSERT_TRUE(stmt != NULL, "expected assignment statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_ASSIGN,
+        "expected assignment statement");
+    ASSERT_TRUE(token_equals(stmt->token, "a"),
+        "expected assignment target");
+    ASSERT_TRUE(stmt->first_child != NULL,
+        "expected assignment expression");
+
+    stmt = stmt->next;
+    ASSERT_TRUE(stmt != NULL, "expected return statement");
+    ASSERT_TRUE(stmt->type == PARSER_NODE_RETURN,
+        "expected return statement");
 
     parser_free_node(node);
     return 1;

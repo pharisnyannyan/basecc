@@ -15,6 +15,11 @@ typedef struct FunctionContext {
     TokenType return_base_token;
     const struct GlobalSymbol *globals;
     size_t global_count;
+    const ParserNode *params;
+    size_t param_count;
+    struct LocalSymbol *locals;
+    size_t local_count;
+    size_t local_capacity;
     const struct FunctionSymbol *functions;
     size_t function_count;
 } FunctionContext;
@@ -41,7 +46,19 @@ typedef struct FunctionSymbol {
     size_t length;
     Token type_token;
     int pointer_depth;
+    const ParserNode *param_list;
+    size_t param_count;
 } FunctionSymbol;
+
+typedef struct LocalSymbol {
+    const char *name;
+    size_t length;
+    Token type_token;
+    int pointer_depth;
+    char ir_name[32];
+} LocalSymbol;
+
+static int codegen_set_error(Codegen *codegen, const char *message);
 
 static int token_is_punct(Token token, const char *text)
 {
@@ -167,6 +184,71 @@ static const FunctionSymbol *codegen_find_function(const FunctionContext *ctx,
     return NULL;
 }
 
+static const LocalSymbol *codegen_find_local(const FunctionContext *ctx,
+    Token name)
+{
+    size_t i = 0;
+
+    for (i = 0; i < ctx->local_count; i++) {
+        if (codegen_name_matches(name,
+                ctx->locals[i].name,
+                ctx->locals[i].length)) {
+            return &ctx->locals[i];
+        }
+    }
+
+    return NULL;
+}
+
+static LocalSymbol *codegen_add_local(FunctionContext *ctx,
+    const ParserNode *node)
+{
+    size_t new_capacity = 0;
+    LocalSymbol *locals = NULL;
+    LocalSymbol *symbol = NULL;
+
+    if (ctx->local_count + 1 > ctx->local_capacity) {
+        new_capacity = ctx->local_capacity ? ctx->local_capacity * 2 : 8;
+        locals = realloc(ctx->locals, new_capacity * sizeof(*locals));
+        if (!locals) {
+            codegen_set_error(ctx->codegen, "codegen: out of memory");
+            return NULL;
+        }
+
+        ctx->locals = locals;
+        ctx->local_capacity = new_capacity;
+    }
+
+    symbol = &ctx->locals[ctx->local_count++];
+    symbol->name = node->token.start;
+    symbol->length = node->token.length;
+    symbol->type_token = node->type_token;
+    symbol->pointer_depth = node->pointer_depth;
+    snprintf(symbol->ir_name, sizeof(symbol->ir_name), "%%t%d",
+        ctx->next_temp_id++);
+    return symbol;
+}
+
+static const ParserNode *codegen_find_param(const FunctionContext *ctx,
+    Token name)
+{
+    const ParserNode *param = ctx->params;
+    size_t index = 0;
+
+    for (index = 0; index < ctx->param_count; index++) {
+        if (param && codegen_name_matches(name, param->token.start,
+                param->token.length)) {
+            return param;
+        }
+
+        if (param) {
+            param = param->next;
+        }
+    }
+
+    return NULL;
+}
+
 static int codegen_set_error(Codegen *codegen, const char *message)
 {
     if (!codegen->error_message) {
@@ -174,6 +256,50 @@ static int codegen_set_error(Codegen *codegen, const char *message)
     }
 
     return 0;
+}
+
+static int codegen_function_parts(Codegen *codegen, const ParserNode *node,
+    const ParserNode **param_list_out,
+    size_t *param_count_out,
+    const ParserNode **body_out)
+{
+    const ParserNode *child = NULL;
+    const ParserNode *param_list = NULL;
+    const ParserNode *body = NULL;
+    size_t param_count = 0;
+
+    if (!node->first_child) {
+        return codegen_set_error(codegen,
+            "codegen: expected function body");
+    }
+
+    for (child = node->first_child; child; child = child->next) {
+        if (!child->next) {
+            body = child;
+            break;
+        }
+
+        if (child->type != PARSER_NODE_DECLARATION) {
+            return codegen_set_error(codegen,
+                "codegen: expected parameter declaration");
+        }
+
+        if (param_count == 0) {
+            param_list = child;
+        }
+
+        param_count++;
+    }
+
+    if (!body || body->type != PARSER_NODE_BLOCK) {
+        return codegen_set_error(codegen,
+            "codegen: expected function block");
+    }
+
+    *param_list_out = param_count ? param_list : NULL;
+    *param_count_out = param_count;
+    *body_out = body;
+    return 1;
 }
 
 void codegen_init(Codegen *codegen, const char *input)
@@ -419,16 +545,17 @@ static int codegen_emit_expression(FunctionContext *ctx,
 
     if (node->type == PARSER_NODE_CALL) {
         const FunctionSymbol *symbol = NULL;
+        const ParserNode *arg = NULL;
+        const ParserNode *param = NULL;
+        size_t arg_count = 0;
+        size_t index = 0;
+        char (*arg_values)[32] = NULL;
+        char (*arg_types)[32] = NULL;
         char type_name[32];
 
         if (node->token.type != TOKEN_IDENT) {
             return codegen_set_error(ctx->codegen,
                 "codegen: expected call identifier");
-        }
-
-        if (node->first_child) {
-            return codegen_set_error(ctx->codegen,
-                "codegen: arguments not supported");
         }
 
         symbol = codegen_find_function(ctx, node->token);
@@ -437,21 +564,115 @@ static int codegen_emit_expression(FunctionContext *ctx,
                 "codegen: unknown function");
         }
 
+        arg_count = symbol->param_count;
+        if (arg_count > 0) {
+            arg_values = malloc(arg_count * sizeof(*arg_values));
+            arg_types = malloc(arg_count * sizeof(*arg_types));
+            if (!arg_values || !arg_types) {
+                free(arg_values);
+                free(arg_types);
+                return codegen_set_error(ctx->codegen,
+                    "codegen: out of memory");
+            }
+        }
+
+        arg = node->first_child;
+        param = symbol->param_list;
+        for (index = 0; index < arg_count; index++) {
+            TypeDesc arg_type;
+            TypeDesc param_type;
+            TypeInfo param_info;
+
+            if (!arg || !param) {
+                free(arg_values);
+                free(arg_types);
+                return codegen_set_error(ctx->codegen,
+                    "codegen: argument count mismatch");
+            }
+
+            if (!codegen_emit_expression(ctx, arg,
+                    arg_values[index],
+                    sizeof(arg_values[index]),
+                    &arg_type)) {
+                free(arg_values);
+                free(arg_types);
+                return 0;
+            }
+
+            param_type = codegen_make_type_desc(param->type_token,
+                param->pointer_depth);
+
+            if (param_type.pointer_depth > 0) {
+                if (arg_type.pointer_depth != param_type.pointer_depth
+                    || arg_type.base_token != param_type.base_token) {
+                    free(arg_values);
+                    free(arg_types);
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: argument type mismatch");
+                }
+            } else {
+                if (!codegen_type_is_integer(arg_type)) {
+                    free(arg_values);
+                    free(arg_types);
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: expected integer argument");
+                }
+            }
+
+            codegen_format_type(param->type_token, param->pointer_depth,
+                arg_types[index], sizeof(arg_types[index]));
+
+            param_info = codegen_type_info(param->type_token);
+            if (param_type.pointer_depth == 0 && param_info.width < 32) {
+                char cast_value[32];
+
+                snprintf(cast_value, sizeof(cast_value), "%%t%d",
+                    ctx->next_temp_id++);
+                fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+                    cast_value,
+                    arg_values[index],
+                    arg_types[index]);
+                snprintf(arg_values[index], sizeof(arg_values[index]), "%s",
+                    cast_value);
+            }
+
+            arg = arg->next;
+            param = param->next;
+        }
+
+        if (arg) {
+            free(arg_values);
+            free(arg_types);
+            return codegen_set_error(ctx->codegen,
+                "codegen: argument count mismatch");
+        }
+
         codegen_format_type(symbol->type_token, symbol->pointer_depth,
             type_name, sizeof(type_name));
 
         snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
-        fprintf(ctx->out, "  %s = call %s @%.*s()\n",
+        fprintf(ctx->out, "  %s = call %s @%.*s(",
             value,
             type_name,
             (int)node->token.length,
             node->token.start);
+        for (index = 0; index < arg_count; index++) {
+            if (index > 0) {
+                fprintf(ctx->out, ", ");
+            }
+            fprintf(ctx->out, "%s %s", arg_types[index], arg_values[index]);
+        }
+        fprintf(ctx->out, ")\n");
+        free(arg_values);
+        free(arg_types);
         *type_out = codegen_make_type_desc(symbol->type_token,
             symbol->pointer_depth);
         return 1;
     }
 
     if (node->type == PARSER_NODE_IDENTIFIER) {
+        const LocalSymbol *local = NULL;
+        const ParserNode *param = NULL;
         const GlobalSymbol *symbol = NULL;
         char value_type[32];
         char pointer_type[32];
@@ -464,6 +685,34 @@ static int codegen_emit_expression(FunctionContext *ctx,
         if (node->first_child) {
             return codegen_set_error(ctx->codegen,
                 "codegen: unexpected identifier children");
+        }
+
+        local = codegen_find_local(ctx, node->token);
+        if (local) {
+            codegen_format_type(local->type_token, local->pointer_depth,
+                value_type, sizeof(value_type));
+            codegen_format_type(local->type_token, local->pointer_depth + 1,
+                pointer_type, sizeof(pointer_type));
+
+            snprintf(value, value_size, "%%t%d", ctx->next_temp_id++);
+            fprintf(ctx->out, "  %s = load %s, %s %s\n",
+                value,
+                value_type,
+                pointer_type,
+                local->ir_name);
+            *type_out = codegen_make_type_desc(local->type_token,
+                local->pointer_depth);
+            return 1;
+        }
+
+        param = codegen_find_param(ctx, node->token);
+        if (param) {
+            snprintf(value, value_size, "%%%.*s",
+                (int)param->token.length,
+                param->token.start);
+            *type_out = codegen_make_type_desc(param->type_token,
+                param->pointer_depth);
+            return 1;
         }
 
         symbol = codegen_find_global(ctx, node->token);
@@ -667,6 +916,81 @@ static int codegen_emit_expression(FunctionContext *ctx,
         "codegen: expected expression");
 }
 
+static int codegen_emit_local_declaration(FunctionContext *ctx,
+    const ParserNode *node)
+{
+    LocalSymbol *local = NULL;
+    char type_name[32];
+    char init_value[32];
+    TypeDesc init_type;
+
+    if (node->type != PARSER_NODE_DECLARATION) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected declaration");
+    }
+
+    if (node->token.type != TOKEN_IDENT) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected identifier token");
+    }
+
+    local = codegen_add_local(ctx, node);
+    if (!local) {
+        return 0;
+    }
+
+    codegen_format_type(node->type_token, node->pointer_depth,
+        type_name, sizeof(type_name));
+    fprintf(ctx->out, "  %s = alloca %s\n", local->ir_name, type_name);
+
+    if (!node->first_child) {
+        return 1;
+    }
+
+    if (node->first_child->next) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: unexpected initializer list");
+    }
+
+    if (!codegen_emit_expression(ctx, node->first_child, init_value,
+        sizeof(init_value), &init_type)) {
+        return 0;
+    }
+
+    if (node->pointer_depth > 0) {
+        if (init_type.pointer_depth != node->pointer_depth
+            || init_type.base_token != node->type_token.type) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: initializer type mismatch");
+        }
+    } else {
+        TypeInfo init_info = codegen_type_info(node->type_token);
+        if (!codegen_type_is_integer(init_type)) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected integer initializer");
+        }
+
+        if (init_info.width < 32) {
+            char cast_value[32];
+
+            snprintf(cast_value, sizeof(cast_value), "%%t%d",
+                ctx->next_temp_id++);
+            fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+                cast_value,
+                init_value,
+                type_name);
+            snprintf(init_value, sizeof(init_value), "%s", cast_value);
+        }
+    }
+
+    fprintf(ctx->out, "  store %s %s, %s* %s\n",
+        type_name,
+        init_value,
+        type_name,
+        local->ir_name);
+    return 1;
+}
+
 static void codegen_format_label(char *buffer, size_t size, const char *prefix,
     int id)
 {
@@ -810,16 +1134,6 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
             "codegen: unexpected while statement");
     }
 
-    if (!codegen_emit_expression(ctx, condition, value, sizeof(value),
-        &condition_type)) {
-        return 0;
-    }
-
-    if (!codegen_type_is_integer(condition_type)) {
-        return codegen_set_error(ctx->codegen,
-            "codegen: expected integer condition");
-    }
-
     codegen_format_label(cond_label, sizeof(cond_label), "while.cond",
         ctx->next_label_id++);
     codegen_format_label(body_label, sizeof(body_label), "while.body",
@@ -829,6 +1143,16 @@ static int codegen_emit_while(FunctionContext *ctx, const ParserNode *node)
 
     fprintf(ctx->out, "  br label %%%s\n", cond_label);
     fprintf(ctx->out, "%s:\n", cond_label);
+
+    if (!codegen_emit_expression(ctx, condition, value, sizeof(value),
+        &condition_type)) {
+        return 0;
+    }
+
+    if (!codegen_type_is_integer(condition_type)) {
+        return codegen_set_error(ctx->codegen,
+            "codegen: expected integer condition");
+    }
 
     snprintf(temp, sizeof(temp), "%%t%d", ctx->next_temp_id++);
     fprintf(ctx->out, "  %s = icmp ne i32 %s, 0\n", temp, value);
@@ -859,8 +1183,124 @@ static int codegen_emit_statement(FunctionContext *ctx, const ParserNode *node)
     switch (node->type) {
     case PARSER_NODE_BLOCK:
         return codegen_emit_block(ctx, node);
+    case PARSER_NODE_DECLARATION:
+        if (!codegen_emit_local_declaration(ctx, node)) {
+            return 0;
+        }
+        return 0;
     case PARSER_NODE_IF:
         return codegen_emit_if(ctx, node);
+    case PARSER_NODE_ASSIGN: {
+        const LocalSymbol *local = NULL;
+        const GlobalSymbol *global = NULL;
+        const ParserNode *param = NULL;
+        char value[32];
+        char type_name[32];
+        TypeDesc expr_type;
+
+        if (node->token.type != TOKEN_IDENT) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected assignment identifier");
+        }
+
+        if (!node->first_child || node->first_child->next) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: expected assignment expression");
+        }
+
+        if (!codegen_emit_expression(ctx, node->first_child, value,
+            sizeof(value), &expr_type)) {
+            return 0;
+        }
+
+        local = codegen_find_local(ctx, node->token);
+        if (local) {
+            codegen_format_type(local->type_token, local->pointer_depth,
+                type_name, sizeof(type_name));
+
+            if (local->pointer_depth > 0) {
+                if (expr_type.pointer_depth != local->pointer_depth
+                    || expr_type.base_token != local->type_token.type) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: assignment type mismatch");
+                }
+            } else {
+                TypeInfo info = codegen_type_info(local->type_token);
+                if (!codegen_type_is_integer(expr_type)) {
+                    return codegen_set_error(ctx->codegen,
+                        "codegen: expected integer assignment");
+                }
+
+                if (info.width < 32) {
+                    char cast_value[32];
+
+                    snprintf(cast_value, sizeof(cast_value), "%%t%d",
+                        ctx->next_temp_id++);
+                    fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+                        cast_value,
+                        value,
+                        type_name);
+                    snprintf(value, sizeof(value), "%s", cast_value);
+                }
+            }
+
+            fprintf(ctx->out, "  store %s %s, %s* %s\n",
+                type_name,
+                value,
+                type_name,
+                local->ir_name);
+            return 0;
+        }
+
+        param = codegen_find_param(ctx, node->token);
+        if (param) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: assignment to parameter not supported");
+        }
+
+        global = codegen_find_global(ctx, node->token);
+        if (!global) {
+            return codegen_set_error(ctx->codegen,
+                "codegen: unknown assignment target");
+        }
+
+        codegen_format_type(global->type_token, global->pointer_depth,
+            type_name, sizeof(type_name));
+
+        if (global->pointer_depth > 0) {
+            if (expr_type.pointer_depth != global->pointer_depth
+                || expr_type.base_token != global->type_token.type) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: assignment type mismatch");
+            }
+        } else {
+            TypeInfo info = codegen_type_info(global->type_token);
+            if (!codegen_type_is_integer(expr_type)) {
+                return codegen_set_error(ctx->codegen,
+                    "codegen: expected integer assignment");
+            }
+
+            if (info.width < 32) {
+                char cast_value[32];
+
+                snprintf(cast_value, sizeof(cast_value), "%%t%d",
+                    ctx->next_temp_id++);
+                fprintf(ctx->out, "  %s = trunc i32 %s to %s\n",
+                    cast_value,
+                    value,
+                    type_name);
+                snprintf(value, sizeof(value), "%s", cast_value);
+            }
+        }
+
+        fprintf(ctx->out, "  store %s %s, %s* @%.*s\n",
+            type_name,
+            value,
+            type_name,
+            (int)node->token.length,
+            node->token.start);
+        return 0;
+    }
     case PARSER_NODE_WHILE:
         return codegen_emit_while(ctx, node);
     case PARSER_NODE_RETURN:
@@ -922,6 +1362,12 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     FunctionContext ctx;
     int terminated = 0;
     TypeInfo type_info;
+    const ParserNode *param_list = NULL;
+    const ParserNode *body = NULL;
+    const ParserNode *param = NULL;
+    size_t param_count = 0;
+    size_t index = 0;
+    char param_type[32];
 
     if (node->type != PARSER_NODE_FUNCTION) {
         return codegen_set_error(codegen,
@@ -933,14 +1379,9 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
             "codegen: expected identifier token");
     }
 
-    if (!node->first_child || node->first_child->next) {
-        return codegen_set_error(codegen,
-            "codegen: expected function body");
-    }
-
-    if (node->first_child->type != PARSER_NODE_BLOCK) {
-        return codegen_set_error(codegen,
-            "codegen: expected function block");
+    if (!codegen_function_parts(codegen, node, &param_list, &param_count,
+            &body)) {
+        return 0;
     }
 
     ctx.codegen = codegen;
@@ -955,16 +1396,41 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     ctx.return_base_token = node->type_token.type;
     ctx.globals = globals;
     ctx.global_count = global_count;
+    ctx.params = param_list;
+    ctx.param_count = param_count;
+    ctx.locals = NULL;
+    ctx.local_count = 0;
+    ctx.local_capacity = 0;
     ctx.functions = functions;
     ctx.function_count = function_count;
 
-    fprintf(out, "define %s @%.*s() {\n",
+    fprintf(out, "define %s @%.*s(",
         ctx.return_type,
         (int)node->token.length,
         node->token.start);
+    param = param_list;
+    for (index = 0; index < param_count; index++) {
+        if (index > 0) {
+            fprintf(out, ", ");
+        }
+
+        if (!param) {
+            return codegen_set_error(codegen,
+                "codegen: expected parameter");
+        }
+
+        codegen_format_type(param->type_token, param->pointer_depth,
+            param_type, sizeof(param_type));
+        fprintf(out, "%s %%%.*s",
+            param_type,
+            (int)param->token.length,
+            param->token.start);
+        param = param->next;
+    }
+    fprintf(out, ") {\n");
     fprintf(out, "entry:\n");
 
-    terminated = codegen_emit_block(&ctx, node->first_child);
+    terminated = codegen_emit_block(&ctx, body);
     if (codegen->error_message) {
         return 0;
     }
@@ -974,6 +1440,7 @@ static int codegen_emit_function(Codegen *codegen, const ParserNode *node,
     }
 
     fprintf(out, "}\n");
+    free(ctx.locals);
     return 1;
 }
 
@@ -1042,10 +1509,21 @@ static int codegen_emit_translation_unit(Codegen *codegen,
         }
 
         if (child->type == PARSER_NODE_FUNCTION) {
+            const ParserNode *param_list = NULL;
+            const ParserNode *body = NULL;
+            size_t param_count = 0;
+
+            if (!codegen_function_parts(codegen, child, &param_list,
+                    &param_count, &body)) {
+                goto cleanup;
+            }
+
             functions[function_index].name = child->token.start;
             functions[function_index].length = child->token.length;
             functions[function_index].type_token = child->type_token;
             functions[function_index].pointer_depth = child->pointer_depth;
+            functions[function_index].param_list = param_list;
+            functions[function_index].param_count = param_count;
             function_index++;
             continue;
         }

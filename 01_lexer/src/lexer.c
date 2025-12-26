@@ -131,6 +131,10 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_TYPEDEF, text, length);
     }
 
+    if (length == 6 && strncmp(text, "extern", 6) == 0) {
+        return make_token(TOKEN_EXTERN, text, length);
+    }
+
     if (length == 4 && strncmp(text, "void", 4) == 0) {
         return make_token(TOKEN_VOID, text, length);
     }

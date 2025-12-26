@@ -56,6 +56,9 @@ STRUCT_EXPECTED := struct_basic_driver_expected.txt
 STRUCT_LIST_LL := ../build/codegen_struct_linked_list.ll
 STRUCT_LIST_INPUT := testdata/struct_linked_list.c
 STRUCT_LIST_EXPECTED := struct_linked_list_driver_expected.txt
+EXTERN_LL := ../build/codegen_extern_calls.ll
+EXTERN_INPUT := testdata/extern_calls.c
+EXTERN_EXPECTED := extern_calls_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -132,6 +135,10 @@ STRUCT_LIST_OBJ := $(BUILD_DIR)/struct_linked_list.o
 STRUCT_LIST_BIN := $(BUILD_DIR)/struct_linked_list_driver
 STRUCT_LIST_DRIVER := struct_linked_list_driver.c
 STRUCT_LIST_OUTPUT := $(BUILD_DIR)/struct_linked_list_output.txt
+EXTERN_OBJ := $(BUILD_DIR)/extern_calls.o
+EXTERN_BIN := $(BUILD_DIR)/extern_calls_driver
+EXTERN_DRIVER := extern_calls_driver.c
+EXTERN_OUTPUT := $(BUILD_DIR)/extern_calls_output.txt
 
 .PHONY: all compile generate run verify clean
 
@@ -139,13 +146,13 @@ all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) \
 	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN) $(HEAP_SORT_BIN) \
 	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN) \
 	$(BST_BIN) $(SIEVE_BIN) $(GCD_BIN) $(CONV_BIN) \
-	$(STRUCT_BIN) $(STRUCT_LIST_BIN)
+	$(STRUCT_BIN) $(STRUCT_LIST_BIN) $(EXTERN_BIN)
 
 generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) \
 	$(QUICK_SORT_LL) $(MERGE_SORT_LL) $(HEAP_SORT_LL) \
 	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL) \
 	$(BST_LL) $(SIEVE_LL) $(GCD_LL) $(CONV_LL) \
-	$(STRUCT_LL) $(STRUCT_LIST_LL)
+	$(STRUCT_LL) $(STRUCT_LIST_LL) $(EXTERN_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -198,17 +205,20 @@ $(STRUCT_LL): $(CODEGEN_BIN) $(STRUCT_INPUT)
 $(STRUCT_LIST_LL): $(CODEGEN_BIN) $(STRUCT_LIST_INPUT)
 	./$(CODEGEN_BIN) $(STRUCT_LIST_INPUT) $(STRUCT_LIST_LL)
 
+$(EXTERN_LL): $(CODEGEN_BIN) $(EXTERN_INPUT)
+	./$(CODEGEN_BIN) $(EXTERN_INPUT) $(EXTERN_LL)
+
 compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ) \
 	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ) $(HEAP_SORT_OBJ) \
 	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ) \
 	$(BST_OBJ) $(SIEVE_OBJ) $(GCD_OBJ) $(CONV_OBJ) \
-	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ)
+	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ) $(EXTERN_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
 	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT) $(MERGE_SORT_OUTPUT) \
 	$(HEAP_SORT_OUTPUT) $(REVERSE_STRING_OUTPUT) $(LOOP_CONTROL_OUTPUT) \
 	$(PRIMES_OUTPUT) $(BST_OUTPUT) $(SIEVE_OUTPUT) $(GCD_OUTPUT) \
-	$(CONV_OUTPUT) $(STRUCT_OUTPUT) $(STRUCT_LIST_OUTPUT)
+	$(CONV_OUTPUT) $(STRUCT_OUTPUT) $(STRUCT_LIST_OUTPUT) $(EXTERN_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
@@ -228,6 +238,7 @@ verify: run
 	cmp -s $(CONV_OUTPUT) $(CONV_EXPECTED)
 	cmp -s $(STRUCT_OUTPUT) $(STRUCT_EXPECTED)
 	cmp -s $(STRUCT_LIST_OUTPUT) $(STRUCT_LIST_EXPECTED)
+	cmp -s $(EXTERN_OUTPUT) $(EXTERN_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -288,6 +299,9 @@ $(STRUCT_OBJ): $(STRUCT_LL) | $(BUILD_DIR)
 $(STRUCT_LIST_OBJ): $(STRUCT_LIST_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(STRUCT_LIST_LL) -o $(STRUCT_LIST_OBJ)
 
+$(EXTERN_OBJ): $(EXTERN_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(EXTERN_LL) -o $(EXTERN_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
@@ -345,6 +359,9 @@ $(STRUCT_LIST_BIN): $(STRUCT_LIST_OBJ) $(STRUCT_LIST_DRIVER)
 	$(CC) $(CFLAGS) -o $(STRUCT_LIST_BIN) $(STRUCT_LIST_DRIVER) \
 		$(STRUCT_LIST_OBJ)
 
+$(EXTERN_BIN): $(EXTERN_OBJ) $(EXTERN_DRIVER)
+	$(CC) $(CFLAGS) -o $(EXTERN_BIN) $(EXTERN_DRIVER) $(EXTERN_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
@@ -395,6 +412,9 @@ $(STRUCT_OUTPUT): $(STRUCT_BIN)
 
 $(STRUCT_LIST_OUTPUT): $(STRUCT_LIST_BIN)
 	./$(STRUCT_LIST_BIN) > $(STRUCT_LIST_OUTPUT)
+
+$(EXTERN_OUTPUT): $(EXTERN_BIN)
+	./$(EXTERN_BIN) > $(EXTERN_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

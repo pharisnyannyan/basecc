@@ -38,6 +38,7 @@ struct ParserNode {
     Token type_token;
     int pointer_depth;
     int is_const;
+    int is_extern;
     size_t array_length;
     ParserNode *first_child;
     ParserNode *next;

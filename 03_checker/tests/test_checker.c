@@ -15,6 +15,7 @@
     X(check_for_loop, "check for loop") \
     X(check_loop_control, "check loop control") \
     X(check_function_call, "check function call") \
+    X(check_extern_function_declaration, "check extern function declaration") \
     X(check_assignment_statement, "check assignment statement") \
     X(check_dereference_assignment, "check dereference assignment") \
     X(check_binary_expression, "check binary expression") \
@@ -154,6 +155,21 @@ TEST(check_function_call, "check function call")
 
     checker_init(&checker,
         "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
+
+    ASSERT_TRUE(checker_check(&checker), "expected check success");
+    ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");
+
+    return 1;
+}
+
+TEST(check_extern_function_declaration, "check extern function declaration")
+{
+    Checker checker;
+
+    checker_init(&checker,
+        "extern int write(int fd, const char *buf, int count);"
+        "int main(){char buffer[4]; int written;"
+        "written = write(1, buffer, 0); return written;}");
 
     ASSERT_TRUE(checker_check(&checker), "expected check success");
     ASSERT_TRUE(checker_error(&checker) == NULL, "unexpected error message");

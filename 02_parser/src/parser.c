@@ -44,6 +44,7 @@ void parser_node_init(ParserNode *node, ParserNodeType type, Token token)
     node->type_token = token;
     node->pointer_depth = 0;
     node->is_const = 0;
+    node->is_extern = 0;
     node->array_length = 0;
     node->first_child = NULL;
     node->next = NULL;
@@ -1513,7 +1514,7 @@ static ParserNode *parser_parse_parameter(Parser *parser)
 }
 
 static ParserNode *parser_parse_function(Parser *parser, Token name_token,
-    Token type_token)
+    Token type_token, int allow_declaration)
 {
     ParserNode *params = NULL;
     ParserNode **tail = &params;
@@ -1553,17 +1554,25 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
         return error_node;
     }
 
-    if (!token_is_punct(parser->last_token, "{")) {
+    if (token_is_punct(parser->last_token, "{")) {
+        body = parser_parse_block(parser);
+        if (!body || body->type == PARSER_NODE_INVALID) {
+            parser_free_node(params);
+            return body;
+        }
+    } else if (allow_declaration && parser_match_punct(parser, ";")) {
+        body = NULL;
+    } else {
+        const char *message = "parser: expected '{'";
+
+        if (allow_declaration) {
+            message = "parser: expected '{' or ';'";
+        }
+
         ParserNode *error_node = parser_make_error(parser, parser->last_token,
-            "parser: expected '{'");
+            message);
         parser_free_node(params);
         return error_node;
-    }
-
-    body = parser_parse_block(parser);
-    if (!body || body->type == PARSER_NODE_INVALID) {
-        parser_free_node(params);
-        return body;
     }
 
     ParserNode *node = parser_alloc_node(parser, PARSER_NODE_FUNCTION,
@@ -1576,7 +1585,9 @@ static ParserNode *parser_parse_function(Parser *parser, Token name_token,
 
     node->type_token = type_token;
     if (params) {
-        *tail = body;
+        if (body) {
+            *tail = body;
+        }
         node->first_child = params;
     } else {
         node->first_child = body;
@@ -1589,6 +1600,7 @@ static ParserNode *parser_parse_external(Parser *parser)
     Token token = parser->last_token;
     TypeSpec spec;
     ParserNode *error_node = NULL;
+    int is_extern = 0;
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
@@ -1596,6 +1608,12 @@ static ParserNode *parser_parse_external(Parser *parser)
 
     if (token.type == TOKEN_TYPEDEF) {
         return parser_parse_typedef(parser);
+    }
+
+    if (token.type == TOKEN_EXTERN) {
+        is_extern = 1;
+        parser_next(parser);
+        token = parser->last_token;
     }
 
     if (token.type == TOKEN_STRUCT) {
@@ -1634,10 +1652,11 @@ static ParserNode *parser_parse_external(Parser *parser)
 
     if (token_is_punct(parser->last_token, "(")) {
         ParserNode *function = parser_parse_function(parser, token,
-            spec.type_token);
+            spec.type_token, is_extern);
         if (function && function->type != PARSER_NODE_INVALID) {
             function->pointer_depth = spec.pointer_depth;
             function->is_const = spec.is_const;
+            function->is_extern = is_extern;
         }
         return function;
     }
@@ -1647,6 +1666,7 @@ static ParserNode *parser_parse_external(Parser *parser)
     if (declaration && declaration->type != PARSER_NODE_INVALID) {
         declaration->pointer_depth = spec.pointer_depth;
         declaration->is_const = spec.is_const;
+        declaration->is_extern = is_extern;
     }
     return declaration;
 }

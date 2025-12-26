@@ -1,0 +1,3 @@
+value=43
+set_result=42
+inc_result=43

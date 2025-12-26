@@ -1,26 +1,18 @@
 # Lexer stage
 
-This stage turns an input byte stream into a stream of tokens. The lexer is
-minimal by design and focuses on clarity over completeness.
+This stage turns an input byte stream into a stream of tokens. The lexer is designed to be simple and robust.
 
-## Supported tokens
-- identifiers: `[A-Za-z_][A-Za-z0-9_]*`
-- numbers: decimal integers
-- punctuators: `+ - * / ( ) { } ; , == != =`
-- keywords: `if else while switch case int short char`
-- invalid: any unsupported single character
-- end-of-file marker
+## Supported Tokens
+- **Identifiers**: `[A-Za-z_][A-Za-z0-9_]*`
+- **Numbers**: Decimal integers.
+- **Punctuators**: `+`, `-`, `*`, `/`, `(`, `)`, `{`, `}`, `;`, `,`, `==`, `!=`, `=`, `<`, `>`, `<=`, `>=`, `&`, `!`, `.`, `->`, `[`, `]`.
+- **Keywords**: `if`, `else`, `while`, `for`, `return`, `break`, `continue`, `int`, `char`, `struct`, `typedef`, `sizeof`, `extern`, `static`, `const`.
+- **Invalid**: Any unsupported character is emitted as an invalid token for error reporting.
+- **EOF**: End-of-file marker.
 
-Whitespace is skipped and never emitted as a token.
+## Behavior
+- Whitespace and comments (standard C style) are skipped.
+- Tokens include their location (line, column) for error reporting.
 
-## Build
-From the repository root:
-```
-make -C 01_lexer
-```
-
-## Test
-From the repository root:
-```
-make test
-```
+## Build and Test
+Run `make all` and `make test` from the repository root to build and verify the lexer.

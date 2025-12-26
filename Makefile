@@ -20,3 +20,11 @@ clean:
 	$(MAKE) -C 02_parser clean
 	$(MAKE) -C 03_checker clean
 	$(MAKE) -C 04_codegen clean
+
+format:
+	find . -name "*.c" -o -name "*.h" | xargs clang-format -i
+
+check-format:
+	find . -name "*.c" -o -name "*.h" | xargs clang-format --dry-run --Werror
+
+.PHONY: all test clean format check-format

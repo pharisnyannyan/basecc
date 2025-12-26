@@ -65,6 +65,18 @@ Building and testing are designed to be fast and simple.
 - **Build all stages**: `make all`
 - **Run all tests**: `make test` (Includes unit tests for each stage and integration tests)
 - **Clean**: `make clean`
+- **Format code**: `make format` (Requires `clang-format`)
+
+## Formatting
+
+This project uses `clang-format` to maintain a consistent coding style. A `.clang-format` configuration file is provided in the root directory.
+
+To format all source and header files, run:
+```bash
+make format
+```
+
+The CI pipeline includes a job to verify that all code adheres to the formatting rules.
 
 ## Continuous Integration
 

@@ -257,10 +257,10 @@ TEST(parse_static_declarations, "parse static declarations") {
   ParserNode *body = NULL;
 
   parser_init(
-      &parser,
-      "static int global;"
-      "const static char *ptr;"
-      "int main(){static short local=2; static int *p=&global; return 0;}");
+    &parser,
+    "static int global;"
+    "const static char *ptr;"
+    "int main(){static short local=2; static int *p=&global; return 0;}");
 
   ParserNode *node = parser_parse(&parser);
   ASSERT_TRUE(node != NULL, "expected parser node");
@@ -325,13 +325,13 @@ TEST(parse_struct_definition, "parse struct definition") {
   ASSERT_TRUE(node->first_child->first_child->next != NULL,
               "expected second struct field");
   ASSERT_TRUE(node->first_child->first_child->next->type ==
-                  PARSER_NODE_DECLARATION,
+                PARSER_NODE_DECLARATION,
               "expected struct field declaration");
   ASSERT_TRUE(
-      token_equals(node->first_child->first_child->next->token, "right"),
-      "expected struct field name");
+    token_equals(node->first_child->first_child->next->token, "right"),
+    "expected struct field name");
   ASSERT_TRUE(node->first_child->first_child->next->type_token.type ==
-                  TOKEN_CHAR,
+                TOKEN_CHAR,
               "expected struct field type");
   ASSERT_TRUE(node->first_child->next != NULL, "expected struct declaration");
   ASSERT_TRUE(node->first_child->next->type == PARSER_NODE_DECLARATION,
@@ -366,12 +366,12 @@ TEST(parse_function_control_flow, "parse function control flow") {
   ASSERT_TRUE(node->first_child->first_child->first_child != NULL,
               "expected first statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->type ==
-                  PARSER_NODE_WHILE,
+                PARSER_NODE_WHILE,
               "expected while statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->next != NULL,
               "expected second statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->next->type ==
-                  PARSER_NODE_IF,
+                PARSER_NODE_IF,
               "expected if statement");
 
   parser_free_node(node);
@@ -382,8 +382,8 @@ TEST(parse_for_loop, "parse for loop") {
   Parser parser;
 
   parser_init(
-      &parser,
-      "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
+    &parser,
+    "int main(){int sum=0;for(int i=3;i;i=i - 1){sum=sum+i;}return sum;}");
 
   ParserNode *node = parser_parse(&parser);
   ASSERT_TRUE(node != NULL, "expected parser node");
@@ -401,7 +401,7 @@ TEST(parse_for_loop, "parse for loop") {
   ASSERT_TRUE(node->first_child->first_child->first_child->next != NULL,
               "expected for statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->next->type ==
-                  PARSER_NODE_FOR,
+                PARSER_NODE_FOR,
               "expected for statement");
 
   parser_free_node(node);
@@ -428,12 +428,12 @@ TEST(parse_loop_control, "parse loop control") {
   ASSERT_TRUE(node->first_child->first_child->first_child != NULL,
               "expected first statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->type ==
-                  PARSER_NODE_WHILE,
+                PARSER_NODE_WHILE,
               "expected while statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->next != NULL,
               "expected for statement");
   ASSERT_TRUE(node->first_child->first_child->first_child->next->type ==
-                  PARSER_NODE_FOR,
+                PARSER_NODE_FOR,
               "expected for statement");
 
   {
@@ -469,8 +469,8 @@ TEST(parse_function_call, "parse function call") {
   Parser parser;
 
   parser_init(
-      &parser,
-      "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
+    &parser,
+    "int foo(int a, int b){return a + b;} int main(){return foo(1, 2);}");
 
   ParserNode *node = parser_parse(&parser);
   ASSERT_TRUE(node != NULL, "expected parser node");
@@ -488,31 +488,31 @@ TEST(parse_function_call, "parse function call") {
   ASSERT_TRUE(node->first_child->next->first_child->first_child != NULL,
               "expected return statement");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->type ==
-                  PARSER_NODE_RETURN,
+                PARSER_NODE_RETURN,
               "expected return statement");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child !=
-                  NULL,
+                NULL,
               "expected return expression");
   ASSERT_TRUE(
-      node->first_child->next->first_child->first_child->first_child->type ==
-          PARSER_NODE_CALL,
-      "expected call expression");
+    node->first_child->next->first_child->first_child->first_child->type ==
+      PARSER_NODE_CALL,
+    "expected call expression");
   ASSERT_TRUE(
-      token_equals(
-          node->first_child->next->first_child->first_child->first_child->token,
-          "foo"),
-      "expected call to 'foo'");
+    token_equals(
+      node->first_child->next->first_child->first_child->first_child->token,
+      "foo"),
+    "expected call to 'foo'");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
-                      ->first_child != NULL,
+                  ->first_child != NULL,
               "expected call arguments");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
-                      ->first_child->type == PARSER_NODE_NUMBER,
+                  ->first_child->type == PARSER_NODE_NUMBER,
               "expected first argument");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
-                      ->first_child->next != NULL,
+                  ->first_child->next != NULL,
               "expected second argument");
   ASSERT_TRUE(node->first_child->next->first_child->first_child->first_child
-                      ->first_child->next->type == PARSER_NODE_NUMBER,
+                  ->first_child->next->type == PARSER_NODE_NUMBER,
               "expected second argument");
 
   parser_free_node(node);
@@ -599,8 +599,8 @@ TEST(parse_dereference_assignment, "parse dereference assignment") {
   Parser parser;
 
   parser_init(
-      &parser,
-      "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
+    &parser,
+    "int main(){int value=1; int *ptr=&value; *ptr = 2; return value;}");
 
   ParserNode *node = parser_parse(&parser);
   ASSERT_TRUE(node != NULL, "expected parser node");
@@ -707,35 +707,35 @@ TEST(parse_parenthesized_arithmetic, "parse parenthesized arithmetic") {
   ASSERT_TRUE(left->first_child->first_child->first_child != NULL,
               "expected '+' left operand");
   ASSERT_TRUE(left->first_child->first_child->first_child->type ==
-                  PARSER_NODE_NUMBER,
+                PARSER_NODE_NUMBER,
               "expected number expression");
   ASSERT_TRUE(left->first_child->first_child->first_child->token.value == 1,
               "expected number 1");
   ASSERT_TRUE(left->first_child->first_child->first_child->next != NULL,
               "expected '+' right operand");
   ASSERT_TRUE(left->first_child->first_child->first_child->next->type ==
-                  PARSER_NODE_NUMBER,
+                PARSER_NODE_NUMBER,
               "expected number expression");
   ASSERT_TRUE(left->first_child->first_child->first_child->next->token.value ==
-                  2,
+                2,
               "expected number 2");
 
   ASSERT_TRUE(left->first_child->first_child->next->first_child != NULL,
               "expected '-' left operand");
   ASSERT_TRUE(left->first_child->first_child->next->first_child->type ==
-                  PARSER_NODE_NUMBER,
+                PARSER_NODE_NUMBER,
               "expected number expression");
   ASSERT_TRUE(left->first_child->first_child->next->first_child->token.value ==
-                  3,
+                3,
               "expected number 3");
   ASSERT_TRUE(left->first_child->first_child->next->first_child->next != NULL,
               "expected '-' right operand");
   ASSERT_TRUE(left->first_child->first_child->next->first_child->next->type ==
-                  PARSER_NODE_NUMBER,
+                PARSER_NODE_NUMBER,
               "expected number expression");
   ASSERT_TRUE(
-      left->first_child->first_child->next->first_child->next->token.value == 4,
-      "expected number 4");
+    left->first_child->first_child->next->first_child->next->token.value == 4,
+    "expected number 4");
 
   parser_free_node(node);
   return 1;
@@ -1075,4 +1075,6 @@ TEST(parse_enum_definition, "parse enum definition") {
 
 static const TestCase tests[] = {TEST_LIST(TEST_ENTRY)};
 
-int main(void) { return test_run(tests, sizeof(tests) / sizeof(tests[0])); }
+int main(void) {
+  return test_run(tests, sizeof(tests) / sizeof(tests[0]));
+}

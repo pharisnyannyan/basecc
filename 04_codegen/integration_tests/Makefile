@@ -23,6 +23,9 @@ FILL_EXPECTED := fill_array_driver_expected.txt
 QUICK_SORT_LL := ../build/codegen_quick_sort.ll
 QUICK_SORT_INPUT := testdata/quick_sort.c
 QUICK_SORT_EXPECTED := quick_sort_driver_expected.txt
+MERGE_SORT_LL := ../build/codegen_merge_sort.ll
+MERGE_SORT_INPUT := testdata/merge_sort.c
+MERGE_SORT_EXPECTED := merge_sort_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -55,12 +58,18 @@ QUICK_SORT_OBJ := $(BUILD_DIR)/quick_sort.o
 QUICK_SORT_BIN := $(BUILD_DIR)/quick_sort_driver
 QUICK_SORT_DRIVER := quick_sort_driver.c
 QUICK_SORT_OUTPUT := $(BUILD_DIR)/quick_sort_output.txt
+MERGE_SORT_OBJ := $(BUILD_DIR)/merge_sort.o
+MERGE_SORT_BIN := $(BUILD_DIR)/merge_sort_driver
+MERGE_SORT_DRIVER := merge_sort_driver.c
+MERGE_SORT_OUTPUT := $(BUILD_DIR)/merge_sort_output.txt
 
 .PHONY: all compile generate run verify clean
 
-all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) $(QUICK_SORT_BIN)
+all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) \
+	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN)
 
-generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) $(QUICK_SORT_LL)
+generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) \
+	$(QUICK_SORT_LL) $(MERGE_SORT_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -80,11 +89,14 @@ $(FILL_LL): $(CODEGEN_BIN) $(FILL_INPUT)
 $(QUICK_SORT_LL): $(CODEGEN_BIN) $(QUICK_SORT_INPUT)
 	./$(CODEGEN_BIN) $(QUICK_SORT_INPUT) $(QUICK_SORT_LL)
 
+$(MERGE_SORT_LL): $(CODEGEN_BIN) $(MERGE_SORT_INPUT)
+	./$(CODEGEN_BIN) $(MERGE_SORT_INPUT) $(MERGE_SORT_LL)
+
 compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ) \
-	$(QUICK_SORT_OBJ)
+	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
-	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT)
+	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT) $(MERGE_SORT_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
@@ -93,6 +105,7 @@ verify: run
 	cmp -s $(SWAP_OUTPUT) $(SWAP_EXPECTED)
 	cmp -s $(FILL_OUTPUT) $(FILL_EXPECTED)
 	cmp -s $(QUICK_SORT_OUTPUT) $(QUICK_SORT_EXPECTED)
+	cmp -s $(MERGE_SORT_OUTPUT) $(MERGE_SORT_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -120,6 +133,9 @@ $(FILL_OBJ): $(FILL_LL) | $(BUILD_DIR)
 $(QUICK_SORT_OBJ): $(QUICK_SORT_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(QUICK_SORT_LL) -o $(QUICK_SORT_OBJ)
 
+$(MERGE_SORT_OBJ): $(MERGE_SORT_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(MERGE_SORT_LL) -o $(MERGE_SORT_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
@@ -139,6 +155,10 @@ $(QUICK_SORT_BIN): $(QUICK_SORT_OBJ) $(QUICK_SORT_DRIVER)
 	$(CC) $(CFLAGS) -o $(QUICK_SORT_BIN) $(QUICK_SORT_DRIVER) \
 		$(QUICK_SORT_OBJ)
 
+$(MERGE_SORT_BIN): $(MERGE_SORT_OBJ) $(MERGE_SORT_DRIVER)
+	$(CC) $(CFLAGS) -o $(MERGE_SORT_BIN) $(MERGE_SORT_DRIVER) \
+		$(MERGE_SORT_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
@@ -156,6 +176,9 @@ $(FILL_OUTPUT): $(FILL_BIN)
 
 $(QUICK_SORT_OUTPUT): $(QUICK_SORT_BIN)
 	./$(QUICK_SORT_BIN) > $(QUICK_SORT_OUTPUT)
+
+$(MERGE_SORT_OUTPUT): $(MERGE_SORT_BIN)
+	./$(MERGE_SORT_BIN) > $(MERGE_SORT_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

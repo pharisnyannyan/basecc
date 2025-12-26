@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-int quick_sort(int *values, int low, int high);
+int merge_sort(int *values, int *temp, int low, int high);
 
 static void fill_random(int *values, int count)
 {
@@ -24,12 +24,13 @@ static int is_sorted(const int *values, int count)
 int main(void)
 {
     int values[10007];
+    int temp[10007];
     int count = 10007;
 
     srand(1337);
     fill_random(values, count);
 
-    quick_sort(values, 0, count - 1);
+    merge_sort(values, temp, 0, count - 1);
 
     if (!is_sorted(values, count)) {
         printf("fail\n");

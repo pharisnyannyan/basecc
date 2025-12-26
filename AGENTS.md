@@ -21,7 +21,7 @@ These guidelines apply to the entire repository.
 - Prefer minimal C tests, shell scripts, or small Python scripts (standard library only).
 - Ensure a single top-level command runs the full test suite.
 - Run all unit tests after each change and fix any failures before proceeding.
-- Run integration tests after each change and fix any failures before proceeding.
+- Run integration tests after each change and fix any failures before proceeding. Use clang for integration tests.
 
 ## Build and CI
 - Prefer simple Makefiles and incremental build rules.

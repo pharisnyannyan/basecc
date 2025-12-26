@@ -1,4 +1,4 @@
-CC ?= cc
+CC ?= clang
 CFLAGS ?= -std=c11 -Wall -Wextra -Werror -O2
 
 .PHONY: all test clean

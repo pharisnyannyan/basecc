@@ -13,6 +13,7 @@
     X(generate_defaults, "generate default initializers") \
     X(generate_pointer_globals, "generate pointer globals") \
     X(generate_pointer_return, "generate pointer return") \
+    X(generate_struct_definitions, "generate struct definitions") \
     X(generate_control_flow_function, "generate control flow function") \
     X(generate_loop_control, "generate loop control") \
     X(generate_function_call, "generate function call") \
@@ -218,6 +219,17 @@ TEST(generate_pointer_return, "generate pointer return")
         "codegen_pointer_return",
         "tests/testdata/pointer_return.c",
         "tests/testdata/pointer_return.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_struct_definitions, "generate struct definitions")
+{
+    CodegenFixture fixture = {
+        "codegen_structs",
+        "tests/testdata/struct_basic.c",
+        "tests/testdata/struct_basic.ll"
     };
 
     return run_codegen_fixture(&fixture);

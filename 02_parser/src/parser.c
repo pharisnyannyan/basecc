@@ -53,6 +53,14 @@ static int token_is_type(Token token)
         || token.type == TOKEN_CHAR;
 }
 
+static Token parser_make_struct_type_token(Token name_token)
+{
+    Token type_token = name_token;
+
+    type_token.type = TOKEN_STRUCT;
+    return type_token;
+}
+
 static ParserNode *parser_alloc_node(Parser *parser, ParserNodeType type,
     Token token)
 {
@@ -117,6 +125,9 @@ static ParserNode *parser_parse_parameter(Parser *parser);
 static ParserNode *parser_parse_assignment_statement(Parser *parser);
 static ParserNode *parser_parse_assignment_expression(Parser *parser);
 static ParserNode *parser_parse_local_declaration(Parser *parser);
+static ParserNode *parser_parse_struct_definition(Parser *parser,
+    Token name_token);
+static ParserNode *parser_parse_struct_field(Parser *parser);
 
 static ParserNode *parser_parse_call(Parser *parser, Token name_token)
 {
@@ -749,6 +760,10 @@ static ParserNode *parser_parse_statement(Parser *parser)
         return parser_parse_continue(parser);
     }
 
+    if (token.type == TOKEN_STRUCT) {
+        return parser_parse_local_declaration(parser);
+    }
+
     if (token_is_type(token)) {
         return parser_parse_local_declaration(parser);
     }
@@ -856,6 +871,117 @@ static ParserNode *parser_parse_assignment_expression(Parser *parser)
     return node;
 }
 
+static ParserNode *parser_parse_struct_field(Parser *parser)
+{
+    Token token = parser->last_token;
+    Token type_token;
+    int pointer_depth = 0;
+    ParserNode *node = NULL;
+
+    if (token.type == TOKEN_INVALID) {
+        return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    if (token.type == TOKEN_STRUCT) {
+        parser_next(parser);
+        token = parser->last_token;
+        if (token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, token,
+                "parser: expected struct name");
+        }
+        type_token = parser_make_struct_type_token(token);
+        parser_next(parser);
+        token = parser->last_token;
+    } else if (token_is_type(token)) {
+        type_token = token;
+        parser_next(parser);
+        token = parser->last_token;
+    } else {
+        return parser_make_error(parser, token, "parser: expected type");
+    }
+
+    while (token_is_punct(token, "*")) {
+        pointer_depth++;
+        parser_next(parser);
+        token = parser->last_token;
+    }
+
+    if (token.type == TOKEN_INVALID) {
+        return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    if (token.type != TOKEN_IDENT) {
+        return parser_make_error(parser, token, "parser: expected identifier");
+    }
+
+    parser_next(parser);
+    if (parser_match_punct(parser, "=")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: unexpected struct field initializer");
+    }
+
+    if (!parser_match_punct(parser, ";")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected ';'");
+    }
+
+    node = parser_alloc_node(parser, PARSER_NODE_DECLARATION, token);
+    if (!node) {
+        return NULL;
+    }
+
+    node->type_token = type_token;
+    node->pointer_depth = pointer_depth;
+    return node;
+}
+
+static ParserNode *parser_parse_struct_definition(Parser *parser,
+    Token name_token)
+{
+    ParserNode *node = NULL;
+    ParserNode **tail = NULL;
+
+    if (!parser_match_punct(parser, "{")) {
+        return parser_make_error(parser, parser->last_token,
+            "parser: expected '{'");
+    }
+
+    node = parser_alloc_node(parser, PARSER_NODE_STRUCT, name_token);
+    if (!node) {
+        return NULL;
+    }
+
+    tail = &node->first_child;
+
+    while (!token_is_punct(parser->last_token, "}")) {
+        ParserNode *field = parser_parse_struct_field(parser);
+
+        if (!field || field->type == PARSER_NODE_INVALID) {
+            parser_free_node(node);
+            return field;
+        }
+
+        *tail = field;
+        tail = &field->next;
+    }
+
+    if (!parser_match_punct(parser, "}")) {
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
+            "parser: expected '}'");
+        parser_free_node(node);
+        return error_node;
+    }
+
+    if (!parser_match_punct(parser, ";")) {
+        ParserNode *error_node = parser_make_error(parser, parser->last_token,
+            "parser: expected ';'");
+        parser_free_node(node);
+        return error_node;
+    }
+
+    return node;
+}
+
 static ParserNode *parser_parse_local_declaration(Parser *parser)
 {
     Token token = parser->last_token;
@@ -866,13 +992,24 @@ static ParserNode *parser_parse_local_declaration(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (!token_is_type(token)) {
+    if (token.type == TOKEN_STRUCT) {
+        parser_next(parser);
+        token = parser->last_token;
+        if (token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, token,
+                "parser: expected struct name");
+        }
+
+        type_token = parser_make_struct_type_token(token);
+        parser_next(parser);
+        token = parser->last_token;
+    } else if (token_is_type(token)) {
+        type_token = token;
+        parser_next(parser);
+        token = parser->last_token;
+    } else {
         return parser_make_error(parser, token, "parser: expected type");
     }
-
-    type_token = token;
-    parser_next(parser);
-    token = parser->last_token;
 
     while (token_is_punct(token, "*")) {
         pointer_depth++;
@@ -910,13 +1047,24 @@ static ParserNode *parser_parse_parameter(Parser *parser)
         return parser_make_error(parser, token, "parser: invalid token");
     }
 
-    if (!token_is_type(token)) {
+    if (token.type == TOKEN_STRUCT) {
+        parser_next(parser);
+        token = parser->last_token;
+        if (token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, token,
+                "parser: expected struct name");
+        }
+
+        type_token = parser_make_struct_type_token(token);
+        parser_next(parser);
+        token = parser->last_token;
+    } else if (token_is_type(token)) {
+        type_token = token;
+        parser_next(parser);
+        token = parser->last_token;
+    } else {
         return parser_make_error(parser, token, "parser: expected type");
     }
-
-    type_token = token;
-    parser_next(parser);
-    token = parser->last_token;
 
     while (token_is_punct(token, "*")) {
         pointer_depth++;
@@ -1023,6 +1171,57 @@ static ParserNode *parser_parse_external(Parser *parser)
 
     if (token.type == TOKEN_INVALID) {
         return parser_make_error(parser, token, "parser: invalid token");
+    }
+
+    if (token.type == TOKEN_STRUCT) {
+        parser_next(parser);
+        token = parser->last_token;
+        if (token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, token,
+                "parser: expected struct name");
+        }
+
+        Token name_token = token;
+        Token type_token = parser_make_struct_type_token(token);
+        parser_next(parser);
+        token = parser->last_token;
+
+        if (token_is_punct(token, "{")) {
+            return parser_parse_struct_definition(parser, name_token);
+        }
+
+        while (token_is_punct(token, "*")) {
+            pointer_depth++;
+            parser_next(parser);
+            token = parser->last_token;
+        }
+
+        if (token.type == TOKEN_INVALID) {
+            return parser_make_error(parser, token, "parser: invalid token");
+        }
+
+        if (token.type != TOKEN_IDENT) {
+            return parser_make_error(parser, token,
+                "parser: expected identifier");
+        }
+
+        parser_next(parser);
+
+        if (token_is_punct(parser->last_token, "(")) {
+            ParserNode *function = parser_parse_function(parser, token,
+                type_token);
+            if (function && function->type != PARSER_NODE_INVALID) {
+                function->pointer_depth = pointer_depth;
+            }
+            return function;
+        }
+
+        ParserNode *declaration = parser_parse_declaration(parser, token,
+            type_token);
+        if (declaration && declaration->type != PARSER_NODE_INVALID) {
+            declaration->pointer_depth = pointer_depth;
+        }
+        return declaration;
     }
 
     if (!token_is_type(token)) {

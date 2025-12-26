@@ -20,6 +20,7 @@ typedef enum TokenType {
     TOKEN_CHAR,
     TOKEN_SHORT,
     TOKEN_INT,
+    TOKEN_STRUCT,
     TOKEN_INVALID = 1000 /* keep stable value for compatibility */
 } TokenType;
 

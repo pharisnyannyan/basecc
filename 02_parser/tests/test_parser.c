@@ -9,6 +9,7 @@
     X(parse_translation_unit, "parse translation unit") \
     X(parse_type_declarations, "parse type declarations") \
     X(parse_pointer_declaration, "parse pointer declaration") \
+    X(parse_struct_definition, "parse struct definition") \
     X(parse_function_control_flow, "parse function control flow") \
     X(parse_for_loop, "parse for loop") \
     X(parse_loop_control, "parse loop control") \
@@ -139,6 +140,55 @@ TEST(parse_pointer_declaration, "parse pointer declaration")
     ASSERT_TRUE(expr->first_child != NULL, "expected dereference operand");
     ASSERT_TRUE(expr->first_child->type == PARSER_NODE_IDENTIFIER,
         "expected identifier operand");
+
+    parser_free_node(node);
+    return 1;
+}
+
+TEST(parse_struct_definition, "parse struct definition")
+{
+    Parser parser;
+
+    parser_init(&parser,
+        "struct Pair { int left; char right; }; struct Pair value;");
+
+    ParserNode *node = parser_parse(&parser);
+    ASSERT_TRUE(node != NULL, "expected parser node");
+    ASSERT_TRUE(parser_error(&parser) == NULL, "unexpected parser error");
+    ASSERT_TRUE(node->type == PARSER_NODE_TRANSLATION_UNIT,
+        "expected translation unit node");
+    ASSERT_TRUE(node->first_child != NULL, "expected struct definition");
+    ASSERT_TRUE(node->first_child->type == PARSER_NODE_STRUCT,
+        "expected struct node");
+    ASSERT_TRUE(token_equals(node->first_child->token, "Pair"),
+        "expected struct name");
+    ASSERT_TRUE(node->first_child->first_child != NULL,
+        "expected struct field");
+    ASSERT_TRUE(node->first_child->first_child->type == PARSER_NODE_DECLARATION,
+        "expected struct field declaration");
+    ASSERT_TRUE(token_equals(node->first_child->first_child->token, "left"),
+        "expected struct field name");
+    ASSERT_TRUE(node->first_child->first_child->type_token.type == TOKEN_INT,
+        "expected struct field type");
+    ASSERT_TRUE(node->first_child->first_child->next != NULL,
+        "expected second struct field");
+    ASSERT_TRUE(node->first_child->first_child->next->type
+        == PARSER_NODE_DECLARATION,
+        "expected struct field declaration");
+    ASSERT_TRUE(token_equals(node->first_child->first_child->next->token,
+        "right"),
+        "expected struct field name");
+    ASSERT_TRUE(node->first_child->first_child->next->type_token.type
+        == TOKEN_CHAR,
+        "expected struct field type");
+    ASSERT_TRUE(node->first_child->next != NULL,
+        "expected struct declaration");
+    ASSERT_TRUE(node->first_child->next->type == PARSER_NODE_DECLARATION,
+        "expected declaration node");
+    ASSERT_TRUE(node->first_child->next->type_token.type == TOKEN_STRUCT,
+        "expected struct type");
+    ASSERT_TRUE(token_equals(node->first_child->next->type_token, "Pair"),
+        "expected struct type name");
 
     parser_free_node(node);
     return 1;

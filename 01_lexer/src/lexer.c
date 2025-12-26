@@ -135,6 +135,10 @@ static Token lex_identifier(Lexer *lexer)
         return make_token(TOKEN_INT, text, length);
     }
 
+    if (length == 6 && strncmp(text, "struct", 6) == 0) {
+        return make_token(TOKEN_STRUCT, text, length);
+    }
+
     return make_token(TOKEN_IDENT, text, length);
 }
 

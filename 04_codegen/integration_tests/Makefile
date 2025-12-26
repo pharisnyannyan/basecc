@@ -38,6 +38,9 @@ LOOP_CONTROL_EXPECTED := loop_control_driver_expected.txt
 PRIMES_LL := ../build/codegen_primes.ll
 PRIMES_INPUT := testdata/primes.c
 PRIMES_EXPECTED := primes_driver_expected.txt
+STRUCT_LL := ../build/codegen_struct_basic.ll
+STRUCT_INPUT := testdata/struct_basic.c
+STRUCT_EXPECTED := struct_basic_driver_expected.txt
 
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
@@ -90,16 +93,22 @@ PRIMES_OBJ := $(BUILD_DIR)/primes.o
 PRIMES_BIN := $(BUILD_DIR)/primes_driver
 PRIMES_DRIVER := primes_driver.c
 PRIMES_OUTPUT := $(BUILD_DIR)/primes_output.txt
+STRUCT_OBJ := $(BUILD_DIR)/struct_basic.o
+STRUCT_BIN := $(BUILD_DIR)/struct_basic_driver
+STRUCT_DRIVER := struct_basic_driver.c
+STRUCT_OUTPUT := $(BUILD_DIR)/struct_basic_output.txt
 
 .PHONY: all compile generate run verify clean
 
 all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(FILL_BIN) \
 	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN) $(HEAP_SORT_BIN) \
-	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN)
+	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN) \
+	$(STRUCT_BIN)
 
 generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(FILL_LL) \
 	$(QUICK_SORT_LL) $(MERGE_SORT_LL) $(HEAP_SORT_LL) \
-	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL)
+	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL) \
+	$(STRUCT_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -134,14 +143,18 @@ $(LOOP_CONTROL_LL): $(CODEGEN_BIN) $(LOOP_CONTROL_INPUT)
 $(PRIMES_LL): $(CODEGEN_BIN) $(PRIMES_INPUT)
 	./$(CODEGEN_BIN) $(PRIMES_INPUT) $(PRIMES_LL)
 
+$(STRUCT_LL): $(CODEGEN_BIN) $(STRUCT_INPUT)
+	./$(CODEGEN_BIN) $(STRUCT_INPUT) $(STRUCT_LL)
+
 compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(FILL_OBJ) \
 	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ) $(HEAP_SORT_OBJ) \
-	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ)
+	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ) \
+	$(STRUCT_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
 	$(FILL_OUTPUT) $(QUICK_SORT_OUTPUT) $(MERGE_SORT_OUTPUT) \
 	$(HEAP_SORT_OUTPUT) $(REVERSE_STRING_OUTPUT) $(LOOP_CONTROL_OUTPUT) \
-	$(PRIMES_OUTPUT)
+	$(PRIMES_OUTPUT) $(STRUCT_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
@@ -155,6 +168,7 @@ verify: run
 	cmp -s $(REVERSE_STRING_OUTPUT) $(REVERSE_STRING_EXPECTED)
 	cmp -s $(LOOP_CONTROL_OUTPUT) $(LOOP_CONTROL_EXPECTED)
 	cmp -s $(PRIMES_OUTPUT) $(PRIMES_EXPECTED)
+	cmp -s $(STRUCT_OUTPUT) $(STRUCT_EXPECTED)
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
@@ -197,6 +211,9 @@ $(LOOP_CONTROL_OBJ): $(LOOP_CONTROL_LL) | $(BUILD_DIR)
 $(PRIMES_OBJ): $(PRIMES_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(PRIMES_LL) -o $(PRIMES_OBJ)
 
+$(STRUCT_OBJ): $(STRUCT_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(STRUCT_LL) -o $(STRUCT_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
@@ -235,6 +252,9 @@ $(LOOP_CONTROL_BIN): $(LOOP_CONTROL_OBJ) $(LOOP_CONTROL_DRIVER)
 $(PRIMES_BIN): $(PRIMES_OBJ) $(PRIMES_DRIVER)
 	$(CC) $(CFLAGS) -o $(PRIMES_BIN) $(PRIMES_DRIVER) $(PRIMES_OBJ)
 
+$(STRUCT_BIN): $(STRUCT_OBJ) $(STRUCT_DRIVER)
+	$(CC) $(CFLAGS) -o $(STRUCT_BIN) $(STRUCT_DRIVER) $(STRUCT_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
@@ -267,6 +287,9 @@ $(LOOP_CONTROL_OUTPUT): $(LOOP_CONTROL_BIN)
 
 $(PRIMES_OUTPUT): $(PRIMES_BIN)
 	./$(PRIMES_BIN) > $(PRIMES_OUTPUT)
+
+$(STRUCT_OUTPUT): $(STRUCT_BIN)
+	./$(STRUCT_BIN) > $(STRUCT_OUTPUT)
 
 clean:
 	rm -rf $(BUILD_DIR)

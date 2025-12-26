@@ -182,9 +182,10 @@ TEST(negative_numbers, "negative numbers") {
 
 TEST(keywords, "keywords") {
   Lexer lexer;
-  lexer_init(&lexer,
-             "if else while for switch case break continue return "
-             "sizeof typedef extern static void const char short int struct");
+  lexer_init(
+      &lexer,
+      "if else while for switch case break continue return "
+      "sizeof typedef extern static void const char short int struct enum");
 
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_IF, "if");
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_ELSE, "else");
@@ -205,6 +206,7 @@ TEST(keywords, "keywords") {
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_SHORT, "short");
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_INT, "int");
   ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_STRUCT, "struct");
+  ASSERT_KEYWORD_TOKEN(lexer_next(&lexer), TOKEN_ENUM, "enum");
 
   ASSERT_TRUE(lexer_next(&lexer).type == TOKEN_EOF, "expected TOKEN_EOF");
 

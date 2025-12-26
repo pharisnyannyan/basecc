@@ -27,7 +27,8 @@
   X(generate_sizeof_struct_custom, "generate sizeof for custom struct")        \
   X(check_invalid_syntax, "reject invalid syntax")                             \
   X(check_const_assignment, "reject const assignment")                         \
-  X(check_const_field_assignment, "reject const field assignment")
+  X(check_const_field_assignment, "reject const field assignment")             \
+  X(generate_enum_definitions, "generate enum definitions")
 
 static char *read_file(const char *path, size_t *size_out) {
   FILE *file = fopen(path, "rb");
@@ -359,6 +360,13 @@ TEST(check_const_field_assignment, "reject const field assignment") {
 
   free(source);
   return 1;
+}
+
+TEST(generate_enum_definitions, "generate enum definitions") {
+  CodegenFixture fixture = {"codegen_enums", "tests/testdata/enum_basic.c",
+                            "tests/testdata/enum_basic.ll"};
+
+  return run_codegen_fixture(&fixture);
 }
 
 #define TEST_ENTRY(name, description) {description, test_##name},

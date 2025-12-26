@@ -4,42 +4,43 @@
 #include <stddef.h>
 
 typedef enum TokenType {
-    TOKEN_EOF = 0,
-    TOKEN_IDENT,
-    TOKEN_NUMBER,
-    TOKEN_PUNCT,
-    TOKEN_IF,
-    TOKEN_ELSE,
-    TOKEN_WHILE,
-    TOKEN_FOR,
-    TOKEN_SWITCH,
-    TOKEN_CASE,
-    TOKEN_BREAK,
-    TOKEN_CONTINUE,
-    TOKEN_RETURN,
-    TOKEN_SIZEOF,
-    TOKEN_TYPEDEF,
-    TOKEN_EXTERN,
-    TOKEN_STATIC,
-    TOKEN_VOID,
-    TOKEN_CONST,
-    TOKEN_CHAR,
-    TOKEN_SHORT,
-    TOKEN_INT,
-    TOKEN_STRUCT,
-    TOKEN_INVALID = 1000 /* keep stable value for compatibility */
+  TOKEN_EOF = 0,
+  TOKEN_IDENT,
+  TOKEN_NUMBER,
+  TOKEN_PUNCT,
+  TOKEN_IF,
+  TOKEN_ELSE,
+  TOKEN_WHILE,
+  TOKEN_FOR,
+  TOKEN_SWITCH,
+  TOKEN_CASE,
+  TOKEN_BREAK,
+  TOKEN_CONTINUE,
+  TOKEN_RETURN,
+  TOKEN_SIZEOF,
+  TOKEN_TYPEDEF,
+  TOKEN_EXTERN,
+  TOKEN_STATIC,
+  TOKEN_VOID,
+  TOKEN_CONST,
+  TOKEN_CHAR,
+  TOKEN_SHORT,
+  TOKEN_INT,
+  TOKEN_STRUCT,
+  TOKEN_ENUM,
+  TOKEN_INVALID = 1000 /* keep stable value for compatibility */
 } TokenType;
 
 typedef struct Token {
-    TokenType type;
-    const char *start;
-    size_t length;
-    long value;
+  TokenType type;
+  const char *start;
+  size_t length;
+  long value;
 } Token;
 
 typedef struct Lexer {
-    const char *input;
-    size_t pos;
+  const char *input;
+  size_t pos;
 } Lexer;
 
 void lexer_init(Lexer *lexer, const char *input);

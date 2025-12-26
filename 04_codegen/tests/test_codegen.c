@@ -19,6 +19,7 @@
     X(generate_function_call, "generate function call") \
     X(generate_arithmetic_function, "generate arithmetic function") \
     X(generate_logical_function, "generate logical operators") \
+    X(generate_sizeof, "generate sizeof expressions") \
     X(check_invalid_syntax, "reject invalid syntax")
 
 static char *read_file(const char *path, size_t *size_out)
@@ -285,6 +286,17 @@ TEST(generate_logical_function, "generate logical operators")
         "codegen_logical",
         "tests/testdata/logical_ops.c",
         "tests/testdata/logical_ops.ll"
+    };
+
+    return run_codegen_fixture(&fixture);
+}
+
+TEST(generate_sizeof, "generate sizeof expressions")
+{
+    CodegenFixture fixture = {
+        "codegen_sizeof",
+        "tests/testdata/sizeof_ops.c",
+        "tests/testdata/sizeof_ops.ll"
     };
 
     return run_codegen_fixture(&fixture);

@@ -159,6 +159,29 @@ static int checker_validate_expression(Checker *checker,
         return checker_validate_expression(checker, operand);
     }
 
+    if (node->type == PARSER_NODE_SIZEOF) {
+        const ParserNode *operand = node->first_child;
+
+        if (operand && operand->next) {
+            return checker_set_error(checker,
+                "checker: expected sizeof operand");
+        }
+
+        if (!operand) {
+            if (node->type_token.type != TOKEN_CHAR
+                && node->type_token.type != TOKEN_SHORT
+                && node->type_token.type != TOKEN_INT
+                && node->type_token.type != TOKEN_STRUCT) {
+                return checker_set_error(checker,
+                    "checker: expected sizeof type");
+            }
+
+            return 1;
+        }
+
+        return checker_validate_expression(checker, operand);
+    }
+
     if (node->type == PARSER_NODE_BINARY) {
         const ParserNode *left = node->first_child;
         const ParserNode *right = left ? left->next : NULL;

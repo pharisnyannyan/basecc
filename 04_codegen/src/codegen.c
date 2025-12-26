@@ -2173,8 +2173,9 @@ static int codegen_emit_expression(FunctionContext *ctx, const ParserNode *node,
     const ParserNode *param = NULL;
     size_t arg_count = 0;
     size_t index = 0;
-    char (*arg_values)[32] = NULL;
-    char (*arg_types)[32] = NULL;
+    typedef char NameBuffer[32];
+    NameBuffer *arg_values = NULL;
+    NameBuffer *arg_types = NULL;
     char type_name[32];
     TypeDesc return_type;
 

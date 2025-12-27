@@ -1,1 +1,2 @@
-struct_smoke=1
+struct_smoke=30
+struct_set_and_get=30

@@ -1,0 +1,4 @@
+size_int=4
+size_s1=8
+size_s1_ptr=8
+size_val=4

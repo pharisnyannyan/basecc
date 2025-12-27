@@ -1,10 +1,19 @@
 struct Pair {
   int left;
-  char right;
+  int right;
 };
 
-struct Pair value;
+struct Pair g_pair;
 
 int struct_smoke() {
-  return 1;
+  g_pair.left = 10;
+  g_pair.right = 20;
+  return g_pair.left + g_pair.right;
+}
+
+int struct_set_and_get(int a, int b) {
+  struct Pair p;
+  p.left = a;
+  p.right = b;
+  return p.left * p.right;
 }

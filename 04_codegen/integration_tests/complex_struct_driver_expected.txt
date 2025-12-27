@@ -1,0 +1,2 @@
+sum_data=60
+second_value=20

@@ -1,0 +1,4 @@
+red=0
+blue=10
+yellow=11
+enum_logic=11

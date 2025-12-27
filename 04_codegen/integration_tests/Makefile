@@ -67,6 +67,22 @@ EXTERN_IO_INPUT := testdata/extern_io.c
 EXTERN_IO_EXPECTED := extern_io_driver_expected.txt
 EXTERN_IO_ERR_EXPECTED := extern_io_driver_expected_err.txt
 
+ENUM_LL := $(BUILD_DIR)/codegen_enum.ll
+ENUM_INPUT := testdata/enum_test.c
+ENUM_EXPECTED := enum_driver_expected.txt
+
+STATIC_LL := $(BUILD_DIR)/codegen_static_local.ll
+STATIC_INPUT := testdata/static_local.c
+STATIC_EXPECTED := static_local_driver_expected.txt
+
+COMPLEX_LL := $(BUILD_DIR)/codegen_complex_struct.ll
+COMPLEX_INPUT := testdata/complex_struct.c
+COMPLEX_EXPECTED := complex_struct_driver_expected.txt
+
+SIZEOF_LL := $(BUILD_DIR)/codegen_sizeof_test.ll
+SIZEOF_INPUT := testdata/sizeof_test.c
+SIZEOF_EXPECTED := sizeof_driver_expected.txt
+
 CODEGEN_LIB := ../build/libcodegen.a
 CHECKER_LIB := ../../03_checker/build/libchecker.a
 PARSER_LIB := ../../02_parser/build/libparser.a
@@ -156,19 +172,41 @@ EXTERN_IO_DRIVER := extern_io_driver.c
 EXTERN_IO_OUTPUT := $(BUILD_DIR)/extern_io_output.txt
 EXTERN_IO_ERR_OUTPUT := $(BUILD_DIR)/extern_io_error.txt
 
+ENUM_OBJ := $(BUILD_DIR)/enum.o
+ENUM_BIN := $(BUILD_DIR)/enum_driver
+ENUM_DRIVER := enum_driver.c
+ENUM_OUTPUT := $(BUILD_DIR)/enum_output.txt
+
+STATIC_OBJ := $(BUILD_DIR)/static_local.o
+STATIC_BIN := $(BUILD_DIR)/static_local_driver
+STATIC_DRIVER := static_local_driver.c
+STATIC_OUTPUT := $(BUILD_DIR)/static_local_output.txt
+
+COMPLEX_OBJ := $(BUILD_DIR)/complex_struct.o
+COMPLEX_BIN := $(BUILD_DIR)/complex_struct_driver
+COMPLEX_DRIVER := complex_struct_driver.c
+COMPLEX_OUTPUT := $(BUILD_DIR)/complex_struct_output.txt
+
+SIZEOF_OBJ := $(BUILD_DIR)/sizeof_test.o
+SIZEOF_BIN := $(BUILD_DIR)/sizeof_driver
+SIZEOF_DRIVER := sizeof_driver.c
+SIZEOF_OUTPUT := $(BUILD_DIR)/sizeof_output.txt
+
 .PHONY: all compile generate run verify clean
 
 all: $(BIN) $(FIB_BIN) $(FOR_BIN) $(SWAP_BIN) $(DOUBLE_PTR_BIN) $(FILL_BIN) \
 	$(QUICK_SORT_BIN) $(MERGE_SORT_BIN) $(HEAP_SORT_BIN) \
 	$(REVERSE_STRING_BIN) $(LOOP_CONTROL_BIN) $(PRIMES_BIN) \
 	$(BST_BIN) $(SIEVE_BIN) $(GCD_BIN) $(CONV_BIN) \
-	$(STRUCT_BIN) $(STRUCT_LIST_BIN) $(EXTERN_BIN) $(EXTERN_IO_BIN)
+	$(STRUCT_BIN) $(STRUCT_LIST_BIN) $(EXTERN_BIN) $(EXTERN_IO_BIN) \
+	$(ENUM_BIN) $(STATIC_BIN) $(COMPLEX_BIN) $(SIZEOF_BIN)
 
 generate: $(LL) $(FIB_LL) $(FOR_LL) $(SWAP_LL) $(DOUBLE_PTR_LL) $(FILL_LL) \
 	$(QUICK_SORT_LL) $(MERGE_SORT_LL) $(HEAP_SORT_LL) \
 	$(REVERSE_STRING_LL) $(LOOP_CONTROL_LL) $(PRIMES_LL) \
 	$(BST_LL) $(SIEVE_LL) $(GCD_LL) $(CONV_LL) \
-	$(STRUCT_LL) $(STRUCT_LIST_LL) $(EXTERN_LL) $(EXTERN_IO_LL)
+	$(STRUCT_LL) $(STRUCT_LIST_LL) $(EXTERN_LL) $(EXTERN_IO_LL) \
+	$(ENUM_LL) $(STATIC_LL) $(COMPLEX_LL) $(SIZEOF_LL)
 
 $(LL): $(CODEGEN_BIN) $(INPUT)
 	./$(CODEGEN_BIN) $(INPUT) $(LL)
@@ -230,12 +268,25 @@ $(EXTERN_LL): $(CODEGEN_BIN) $(EXTERN_INPUT)
 $(EXTERN_IO_LL): $(CODEGEN_BIN) $(EXTERN_IO_INPUT)
 	./$(CODEGEN_BIN) $(EXTERN_IO_INPUT) $(EXTERN_IO_LL)
 
+$(ENUM_LL): $(CODEGEN_BIN) $(ENUM_INPUT)
+	./$(CODEGEN_BIN) $(ENUM_INPUT) $(ENUM_LL)
+
+$(STATIC_LL): $(CODEGEN_BIN) $(STATIC_INPUT)
+	./$(CODEGEN_BIN) $(STATIC_INPUT) $(STATIC_LL)
+
+$(COMPLEX_LL): $(CODEGEN_BIN) $(COMPLEX_INPUT)
+	./$(CODEGEN_BIN) $(COMPLEX_INPUT) $(COMPLEX_LL)
+
+$(SIZEOF_LL): $(CODEGEN_BIN) $(SIZEOF_INPUT)
+	./$(CODEGEN_BIN) $(SIZEOF_INPUT) $(SIZEOF_LL)
+
 compile: generate $(OBJ) $(FIB_OBJ) $(FOR_OBJ) $(SWAP_OBJ) $(DOUBLE_PTR_OBJ) \
 	$(FILL_OBJ) \
 	$(QUICK_SORT_OBJ) $(MERGE_SORT_OBJ) $(HEAP_SORT_OBJ) \
 	$(REVERSE_STRING_OBJ) $(LOOP_CONTROL_OBJ) $(PRIMES_OBJ) \
 	$(BST_OBJ) $(SIEVE_OBJ) $(GCD_OBJ) $(CONV_OBJ) \
-	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ) $(EXTERN_OBJ) $(EXTERN_IO_OBJ)
+	$(STRUCT_OBJ) $(STRUCT_LIST_OBJ) $(EXTERN_OBJ) $(EXTERN_IO_OBJ) \
+	$(ENUM_OBJ) $(STATIC_OBJ) $(COMPLEX_OBJ) $(SIZEOF_OBJ)
 
 run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
 	$(DOUBLE_PTR_OUTPUT) \
@@ -243,7 +294,8 @@ run: all $(OUTPUT) $(FIB_OUTPUT) $(FOR_OUTPUT) $(SWAP_OUTPUT) \
 	$(HEAP_SORT_OUTPUT) $(REVERSE_STRING_OUTPUT) $(LOOP_CONTROL_OUTPUT) \
 	$(PRIMES_OUTPUT) $(BST_OUTPUT) $(SIEVE_OUTPUT) $(GCD_OUTPUT) \
 	$(CONV_OUTPUT) $(STRUCT_OUTPUT) $(STRUCT_LIST_OUTPUT) $(EXTERN_OUTPUT) \
-	$(EXTERN_IO_OUTPUT)
+	$(EXTERN_IO_OUTPUT) $(ENUM_OUTPUT) $(STATIC_OUTPUT) $(COMPLEX_OUTPUT) \
+	$(SIZEOF_OUTPUT)
 
 verify: run
 	cmp -s $(OUTPUT) $(EXPECTED)
@@ -266,6 +318,10 @@ verify: run
 	cmp -s $(STRUCT_LIST_OUTPUT) $(STRUCT_LIST_EXPECTED)
 	cmp -s $(EXTERN_OUTPUT) $(EXTERN_EXPECTED)
 	cmp -s $(EXTERN_IO_OUTPUT) $(EXTERN_IO_EXPECTED)
+	cmp -s $(ENUM_OUTPUT) $(ENUM_EXPECTED)
+	cmp -s $(STATIC_OUTPUT) $(STATIC_EXPECTED)
+	cmp -s $(COMPLEX_OUTPUT) $(COMPLEX_EXPECTED)
+	cmp -s $(SIZEOF_OUTPUT) $(SIZEOF_EXPECTED)
 	cmp -s $(EXTERN_IO_ERR_OUTPUT) $(EXTERN_IO_ERR_EXPECTED)
 
 $(BUILD_DIR):
@@ -336,6 +392,18 @@ $(EXTERN_OBJ): $(EXTERN_LL) | $(BUILD_DIR)
 $(EXTERN_IO_OBJ): $(EXTERN_IO_LL) | $(BUILD_DIR)
 	$(LL_CC) -c $(EXTERN_IO_LL) -o $(EXTERN_IO_OBJ)
 
+$(ENUM_OBJ): $(ENUM_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(ENUM_LL) -o $(ENUM_OBJ)
+
+$(STATIC_OBJ): $(STATIC_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(STATIC_LL) -o $(STATIC_OBJ)
+
+$(COMPLEX_OBJ): $(COMPLEX_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(COMPLEX_LL) -o $(COMPLEX_OBJ)
+
+$(SIZEOF_OBJ): $(SIZEOF_LL) | $(BUILD_DIR)
+	$(LL_CC) -c $(SIZEOF_LL) -o $(SIZEOF_OBJ)
+
 $(BIN): $(OBJ) $(DRIVER)
 	$(CC) $(CFLAGS) -o $(BIN) $(DRIVER) $(OBJ)
 
@@ -403,6 +471,18 @@ $(EXTERN_BIN): $(EXTERN_OBJ) $(EXTERN_DRIVER)
 $(EXTERN_IO_BIN): $(EXTERN_IO_OBJ) $(EXTERN_IO_DRIVER)
 	$(CC) $(CFLAGS) -o $(EXTERN_IO_BIN) $(EXTERN_IO_DRIVER) $(EXTERN_IO_OBJ)
 
+$(ENUM_BIN): $(ENUM_OBJ) $(ENUM_DRIVER)
+	$(CC) $(CFLAGS) -o $(ENUM_BIN) $(ENUM_DRIVER) $(ENUM_OBJ)
+
+$(STATIC_BIN): $(STATIC_OBJ) $(STATIC_DRIVER)
+	$(CC) $(CFLAGS) -o $(STATIC_BIN) $(STATIC_DRIVER) $(STATIC_OBJ)
+
+$(COMPLEX_BIN): $(COMPLEX_OBJ) $(COMPLEX_DRIVER)
+	$(CC) $(CFLAGS) -o $(COMPLEX_BIN) $(COMPLEX_DRIVER) $(COMPLEX_OBJ)
+
+$(SIZEOF_BIN): $(SIZEOF_OBJ) $(SIZEOF_DRIVER)
+	$(CC) $(CFLAGS) -o $(SIZEOF_BIN) $(SIZEOF_DRIVER) $(SIZEOF_OBJ)
+
 $(OUTPUT): $(BIN)
 	./$(BIN) > $(OUTPUT)
 
@@ -459,6 +539,18 @@ $(STRUCT_LIST_OUTPUT): $(STRUCT_LIST_BIN)
 
 $(EXTERN_OUTPUT): $(EXTERN_BIN)
 	./$(EXTERN_BIN) > $(EXTERN_OUTPUT)
+
+$(ENUM_OUTPUT): $(ENUM_BIN)
+	./$(ENUM_BIN) > $(ENUM_OUTPUT)
+
+$(STATIC_OUTPUT): $(STATIC_BIN)
+	./$(STATIC_BIN) > $(STATIC_OUTPUT)
+
+$(COMPLEX_OUTPUT): $(COMPLEX_BIN)
+	./$(COMPLEX_BIN) > $(COMPLEX_OUTPUT)
+
+$(SIZEOF_OUTPUT): $(SIZEOF_BIN)
+	./$(SIZEOF_BIN) > $(SIZEOF_OUTPUT)
 
 $(EXTERN_IO_OUTPUT): $(EXTERN_IO_BIN)
 	printf "input" | ./$(EXTERN_IO_BIN) > $(EXTERN_IO_OUTPUT) \

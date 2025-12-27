@@ -2,6 +2,8 @@
 
 These guidelines apply to the entire repository.
 
+Create a new branch for your new change.
+
 ## Core principles
 - Prefer clarity and explicit control flow over cleverness.
 - Use simple data structures and readable C.
